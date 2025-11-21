@@ -9,6 +9,7 @@
     "dev": "tsx src/cli.ts",
     "scan": "tsx src/cli.ts scan",
     "articles": "tsx src/articles-command.ts articles",
+    "batch": "tsx src/batch-command.ts batch",
     "test": "jest",
     "type-check": "tsc --noEmit",
     "verify": "node verify.js",

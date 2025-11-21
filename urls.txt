@@ -1,0 +1,7 @@
+# Sample URLs for batch generation
+# Add one URL per line
+# Lines starting with # are ignored
+
+https://www.bbc.com/news/articles/cx2p2dz9zk2o
+https://www.theguardian.com/us-news/2025/nov/21/donald-trump-zohran-mamdani-meeting
+https://www.theguardian.com/us-news/2025/nov/21/jimmy-kimmel-donald-trump
