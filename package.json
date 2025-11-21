@@ -8,6 +8,7 @@
     "build": "tsc",
     "dev": "tsx src/cli.ts",
     "scan": "tsx src/cli.ts scan",
+    "articles": "tsx src/articles-command.ts articles",
     "test": "jest",
     "type-check": "tsc --noEmit",
     "verify": "node verify.js",
