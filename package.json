@@ -10,6 +10,7 @@
     "scan": "tsx src/cli.ts scan",
     "articles": "tsx src/articles-command.ts articles",
     "batch": "tsx src/batch-command.ts batch",
+    "export": "tsx src/export-command.ts export",
     "test": "jest",
     "type-check": "tsc --noEmit",
     "verify": "node verify.js",
@@ -33,6 +34,7 @@
     "dotenv": "^17.2.3",
     "node-fetch": "^3.3.2",
     "ora": "^8.0.1",
+    "puppeteer": "^24.31.0",
     "rss-parser": "^3.13.0"
   },
   "devDependencies": {

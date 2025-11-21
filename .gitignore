@@ -35,6 +35,9 @@ logs/
 # Drafts (optional - keep local)
 drafts/*.md
 
+# Exports (generated files)
+exports/
+
 # Scan results (temporary)
 scan_results.json
 
