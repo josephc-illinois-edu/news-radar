@@ -5,6 +5,38 @@ All notable changes to News Radar will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0] - 2025-11-21
+
+### Added
+- **Supabase Database Integration** - Complete PostgreSQL database for article management
+- **Database Schema** - 7 tables: articles, users, sources, revisions, tags, article_tags, analytics_events
+- **Automatic Article Saving** - Articles saved to database by default after generation
+- **Article Management Commands**:
+  - `npm run articles list` - List all saved articles with filtering
+  - `npm run articles view <id>` - View detailed article information
+  - `npm run articles publish <id>` - Publish drafts (draft → published workflow)
+  - `npm run articles archive <id>` - Archive articles
+  - `npm run articles delete <id> --force` - Delete permanently
+- **Draft/Published Workflow** - Status management for article lifecycle
+- **Revision History** - Automatic version tracking for all articles
+- **Source Tracking** - Save source URLs with extracted facts, quotes, and similarity scores
+- **Row Level Security (RLS)** - Database policies for data isolation
+- **TypeScript Service Layer** - Type-safe database operations with full CRUD support
+- **Engagement Tracking** - View counts and analytics events
+- **Database Migrations** - SQL migrations for schema versioning
+
+### Changed
+- Write command now saves to database by default (use `--no-save` to skip)
+- Articles include database ID for future reference
+- Enhanced CLI output with database save confirmation
+
+### Technical Details
+- Tables: users, articles, article_revisions, sources, tags, article_tags, analytics_events
+- Automatic timestamps (created_at, updated_at)
+- UUID primary keys for distributed systems
+- Indexed queries for performance
+- Support for anonymous usage (personal CLI tool)
+
 ## [0.1.0] - 2025-11-21
 
 ### Added

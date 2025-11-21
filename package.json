@@ -1,6 +1,6 @@
 {
   "name": "news-radar",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Predictive news intelligence CLI for detecting emerging stories",
   "main": "dist/index.js",
   "type": "module",
