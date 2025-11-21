@@ -13,6 +13,7 @@ import { promises as fs } from 'fs';
 import { createAIVoiceGenerator } from './generators/ai-voice.js';
 import { createContentFetcher } from './utils/content-fetcher.js';
 import { createPlagiarismChecker } from './utils/plagiarism-checker.js';
+import { createDatabaseService } from './services/database.js';
 import type { StoryResult, VoiceConfig } from './types.js';
 import type { FetchedContent } from './utils/content-fetcher.js';
 
@@ -31,6 +32,7 @@ interface WriteOptions {
   optimism?: number;
   criticism?: number;
   preview?: boolean;
+  save?: boolean;
 }
 
 /**
@@ -278,6 +280,37 @@ async function executeWrite(options: WriteOptions): Promise<void> {
       console.log(chalk.cyan(plagiarismChecker.generateReport(plagiarismResult)));
     }
 
+    // Save to database if enabled
+    let savedArticleId: string | undefined;
+    if (options.save) {
+      spinner.start('Saving article to database...');
+      try {
+        const dbService = createDatabaseService();
+        const dbArticle = await dbService.saveArticleWithSources(
+          article,
+          fetchedContents,
+          {
+            length: options.length,
+            platform: options.platform,
+            style: options.style,
+            tone: {
+              humor: options.humor ?? 4,
+              urgency: options.urgency ?? 7,
+              optimism: options.optimism ?? 6,
+              criticism: options.criticism ?? 5,
+            },
+          }
+        );
+        savedArticleId = dbArticle.id;
+        spinner.succeed(chalk.green(`✓ Saved to database (ID: ${dbArticle.id})`));
+      } catch (error) {
+        spinner.warn(chalk.yellow('Could not save to database'));
+        const message = error instanceof Error ? error.message : 'Unknown error';
+        console.log(chalk.yellow(`⚠ ${message}`));
+        console.log(chalk.gray('(Article will still be saved to file)\n'));
+      }
+    }
+
     // Display article
     console.log('\n' + chalk.bold.cyan('═'.repeat(70)));
     console.log(chalk.bold.white(`  GENERATED ARTICLE (${options.style.toUpperCase()})`));
@@ -359,6 +392,8 @@ const writeCommand = new Command('write')
   .option('-p, --platform <platform>', 'Target platform (facebook, linkedin, newsletter, blog)', 'newsletter')
   .option('--style <style>', 'Writing style (conversational, academic)', 'conversational')
   .option('--preview', 'Preview extracted content and confirm before using API credits')
+  .option('--save', 'Save article to Supabase database (enabled by default)', true)
+  .option('--no-save', 'Skip saving to database')
   .option('-o, --output <path>', 'Output file path')
   .option('--humor <number>', 'Humor level (0-10)', '4')
   .option('--urgency <number>', 'Urgency level (0-10)', '7')
@@ -372,6 +407,7 @@ const writeCommand = new Command('write')
       platform: (cmdOptions.platform as WriteOptions['platform']) || 'newsletter',
       style: (cmdOptions.style as WriteOptions['style']) || 'conversational',
       preview: cmdOptions.preview as boolean || false,
+      save: cmdOptions.save !== false, // Enabled by default unless --no-save is used
       output: cmdOptions.output as string | undefined,
       humor: parseInt(cmdOptions.humor as string, 10),
       urgency: parseInt(cmdOptions.urgency as string, 10),
