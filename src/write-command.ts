@@ -93,6 +93,7 @@ async function executeWrite(options: WriteOptions): Promise<void> {
         optimism: options.optimism ?? 6,
         criticism: options.criticism ?? 5,
       },
+      voiceInstructions: voiceInstructions || undefined,
     };
 
     spinner.text = 'Initializing AI generator...';

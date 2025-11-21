@@ -222,6 +222,7 @@ export interface VoiceConfig {
     optimism: number;
     criticism: number;
   };
+  voiceInstructions?: string;
 }
 
 /**

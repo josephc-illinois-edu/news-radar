@@ -39,6 +39,7 @@ export class AIVoiceGenerator {
         optimism: config.tone?.optimism ?? 6,
         criticism: config.tone?.criticism ?? 5,
       },
+      voiceInstructions: config.voiceInstructions,
     };
   }
 
@@ -98,7 +99,19 @@ ${styleGuide}
 ${toneGuide}
 
 ${lengthGuide}
+`;
 
+    // Add custom voice instructions if provided
+    if (this.config.voiceInstructions) {
+      prompt += `
+PERSONAL WRITING STYLE (trained from your past writing):
+${this.config.voiceInstructions}
+
+IMPORTANT: Follow these voice instructions closely - they reflect your authentic writing style.
+`;
+    }
+
+    prompt += `
 ARTICLE TOPIC: ${story.title}
 SOURCE URL: ${story.url}
 `;
