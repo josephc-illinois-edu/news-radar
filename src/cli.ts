@@ -5,11 +5,11 @@
  * @description Command-line interface for scanning emerging news stories
  */
 
+import 'dotenv/config';
 import { Command } from 'commander';
 import chalk from 'chalk';
 import ora from 'ora';
 import { createHNScraper } from './scrapers/hackernews.js';
-import { createRedditScraper } from './scrapers/reddit.js';
 import { createLobstersScraper } from './scrapers/lobsters.js';
 import { createAPNewsScraper } from './scrapers/apnews.js';
 import { createReutersScraper } from './scrapers/reuters.js';
@@ -17,6 +17,7 @@ import { createBBCScraper } from './scrapers/bbc.js';
 import { createGuardianScraper } from './scrapers/guardian.js';
 import { createNPRScraper } from './scrapers/npr.js';
 import { createTechCrunchScraper } from './scrapers/techcrunch.js';
+import { createNewsDataScraper } from './scrapers/newsdata.js';
 import type { StoryResult, ScanOptions, ScanSummary } from './types.js';
 
 /**
@@ -110,7 +111,7 @@ async function executeScan(options: ScanOptions): Promise<void> {
 
   try {
     const allStories: StoryResult[] = [];
-    const sources = options.sources ?? ['hackernews', 'reddit'];
+    const sources = options.sources ?? ['hackernews', 'newsdata'];
 
     // HackerNews
     if (sources.includes('hackernews')) {
@@ -123,19 +124,6 @@ async function executeScan(options: ScanOptions): Promise<void> {
       const hnStories = await hnScraper.scrape();
       allStories.push(...hnStories);
       spinner.succeed(chalk.green(`✓ HackerNews: ${hnStories.length} stories`));
-    }
-
-    // Reddit
-    if (sources.includes('reddit')) {
-      spinner.start('Scraping Reddit...');
-      const redditScraper = createRedditScraper({
-        subreddits: ['worldnews', 'technology', 'science', 'futurology'],
-        minScore: options.minScore ?? 100,
-        maxPostsPerSubreddit: 15,
-      });
-      const redditStories = await redditScraper.scrape();
-      allStories.push(...redditStories);
-      spinner.succeed(chalk.green(`✓ Reddit: ${redditStories.length} stories`));
     }
 
     // Lobsters
@@ -222,6 +210,31 @@ async function executeScan(options: ScanOptions): Promise<void> {
       spinner.succeed(chalk.green(`✓ TechCrunch: ${techcrunchStories.length} stories`));
     }
 
+    // NewsData.io
+    if (sources.includes('newsdata')) {
+      const apiKey = process.env.NEWSDATA_API_KEY;
+      if (!apiKey) {
+        spinner.warn(chalk.yellow('⚠ NewsData.io: API key not found in .env file'));
+      } else {
+        spinner.start('Scraping NewsData.io...');
+        try {
+          const newsdataScraper = createNewsDataScraper({
+            apiKey,
+            categories: ['top', 'politics', 'technology', 'world'],
+            countries: ['us'],
+            languages: ['en'],
+            maxResults: 30,
+          });
+          const newsdataStories = await newsdataScraper.scrape();
+          allStories.push(...newsdataStories);
+          spinner.succeed(chalk.green(`✓ NewsData.io: ${newsdataStories.length} stories`));
+        } catch (error) {
+          const message = error instanceof Error ? error.message : 'Unknown error';
+          spinner.fail(chalk.red(`✗ NewsData.io: ${message}`));
+        }
+      }
+    }
+
     spinner.stop();
 
     // Filter by keywords if provided
@@ -299,7 +312,7 @@ program
   .command('scan')
   .description('Scan news sources for emerging stories')
   .option('-h, --hours <number>', 'Hours to look back', '24')
-  .option('-s, --sources <sources>', 'Comma-separated sources (hackernews,reddit,lobsters,apnews,reuters,bbc,guardian,npr,techcrunch)', 'hackernews,reddit')
+  .option('-s, --sources <sources>', 'Comma-separated sources (hackernews,lobsters,apnews,reuters,bbc,guardian,npr,techcrunch,newsdata)', 'hackernews,newsdata')
   .option('-m, --min-score <number>', 'Minimum engagement score', '50')
   .option('-k, --keywords <keywords>', 'Filter by keywords (comma-separated)')
   .option('-n, --max-results <number>', 'Maximum results to display', '15')

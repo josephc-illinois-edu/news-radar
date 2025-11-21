@@ -49,7 +49,7 @@ export class LobstersScraper {
   public async scrape(): Promise<StoryResult[]> {
     try {
       console.log('[Lobsters] Fetching stories...');
-
+      
       const feed = await this.parser.parseURL('https://lobste.rs/rss');
       const stories: StoryResult[] = [];
 
@@ -57,11 +57,11 @@ export class LobstersScraper {
         const rssItem = item as LobstersRSSItem;
         const publishedAt = new Date(rssItem.pubDate);
         const ageHours = (Date.now() - publishedAt.getTime()) / (1000 * 60 * 60);
-
+        
         // Lobsters doesn't provide score in RSS, estimate based on recency
         const estimatedScore = Math.max(10, 100 - Math.floor(ageHours * 5));
         const estimatedComments = Math.floor(Math.random() * 20) + 5;
-
+        
         if (estimatedScore < this.config.minScore) continue;
 
         const velocity = (estimatedScore + estimatedComments * 2) / Math.max(ageHours, 0.1);

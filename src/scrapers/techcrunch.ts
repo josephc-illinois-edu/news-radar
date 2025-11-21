@@ -76,7 +76,7 @@ export class TechCrunchScraper {
   public async scrape(): Promise<StoryResult[]> {
     try {
       console.log('[TechCrunch] Fetching stories...');
-
+      
       const feed = await this.parser.parseURL('https://techcrunch.com/feed/');
       const stories: StoryResult[] = [];
 
@@ -84,10 +84,10 @@ export class TechCrunchScraper {
         const rssItem = item as TechCrunchRSSItem;
         const publishedAt = new Date(rssItem.pubDate);
         const ageHours = (Date.now() - publishedAt.getTime()) / (1000 * 60 * 60);
-
+        
         const estimatedScore = Math.max(50, 300 - Math.floor(ageHours * 15));
         const estimatedComments = Math.floor(Math.random() * 80) + 15;
-
+        
         if (estimatedScore < this.config.minScore) continue;
 
         const velocity = (estimatedScore + estimatedComments * 2) / Math.max(ageHours, 0.1);

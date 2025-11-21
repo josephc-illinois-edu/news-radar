@@ -17,12 +17,16 @@ build/
 # OS files
 .DS_Store
 Thumbs.db
+nul
 
 # IDE
 .vscode/
 .idea/
 *.swp
 *.swo
+
+# Claude Code settings
+.claude/settings.local.json
 
 # Logs
 logs/

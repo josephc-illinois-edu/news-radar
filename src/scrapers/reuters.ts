@@ -69,10 +69,10 @@ export class ReutersScraper {
         const rssItem = item as ReutersRSSItem;
         const publishedAt = new Date(rssItem.pubDate);
         const ageHours = (Date.now() - publishedAt.getTime()) / (1000 * 60 * 60);
-
+        
         const estimatedScore = Math.max(100, 300 - Math.floor(ageHours * 15));
         const estimatedComments = Math.floor(Math.random() * 100) + 20;
-
+        
         const velocity = (estimatedScore + estimatedComments * 2) / Math.max(ageHours, 0.1);
 
         stories.push({
@@ -104,7 +104,7 @@ export class ReutersScraper {
 
   public async scrape(): Promise<StoryResult[]> {
     console.log(`[Reuters] Scraping ${this.config.categories.length} categories...`);
-
+    
     const allStories: StoryResult[] = [];
 
     for (const category of this.config.categories) {

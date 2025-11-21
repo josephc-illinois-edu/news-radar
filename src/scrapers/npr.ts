@@ -70,10 +70,10 @@ export class NPRScraper {
         const rssItem = item as NPRRSSItem;
         const publishedAt = new Date(rssItem.pubDate);
         const ageHours = (Date.now() - publishedAt.getTime()) / (1000 * 60 * 60);
-
+        
         const estimatedScore = Math.max(100, 400 - Math.floor(ageHours * 20));
         const estimatedComments = Math.floor(Math.random() * 120) + 25;
-
+        
         const velocity = (estimatedScore + estimatedComments * 2) / Math.max(ageHours, 0.1);
 
         stories.push({
@@ -105,7 +105,7 @@ export class NPRScraper {
 
   public async scrape(): Promise<StoryResult[]> {
     console.log(`[NPR] Scraping ${this.config.categories.length} categories...`);
-
+    
     const allStories: StoryResult[] = [];
 
     for (const category of this.config.categories) {

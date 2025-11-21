@@ -71,12 +71,12 @@ export class APNewsScraper {
         const rssItem = item as APNewsRSSItem;
         const publishedAt = new Date(rssItem.pubDate);
         const ageHours = (Date.now() - publishedAt.getTime()) / (1000 * 60 * 60);
-
+        
         // Estimate engagement based on recency and category
         const baseScore = category === 'topnews' ? 200 : 100;
         const estimatedScore = Math.max(50, baseScore - Math.floor(ageHours * 10));
         const estimatedComments = Math.floor(Math.random() * 50) + 10;
-
+        
         const velocity = (estimatedScore + estimatedComments * 2) / Math.max(ageHours, 0.1);
 
         stories.push({
@@ -108,13 +108,13 @@ export class APNewsScraper {
 
   public async scrape(): Promise<StoryResult[]> {
     console.log(`[AP News] Scraping ${this.config.categories.length} categories...`);
-
+    
     const allStories: StoryResult[] = [];
 
     for (const category of this.config.categories) {
       const stories = await this.scrapeCategory(category);
       allStories.push(...stories);
-
+      
       // Rate limiting
       await new Promise(resolve => setTimeout(resolve, 1000));
     }

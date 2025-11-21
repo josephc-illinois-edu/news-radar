@@ -1,4 +1,4 @@
-# News Scanner Skill
+cl# News Scanner Skill
 
 Automates the process of scanning news sources for emerging stories with high engagement velocity.
 

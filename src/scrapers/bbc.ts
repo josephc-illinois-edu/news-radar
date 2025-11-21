@@ -72,10 +72,10 @@ export class BBCScraper {
         const rssItem = item as BBCRSSItem;
         const publishedAt = new Date(rssItem.pubDate);
         const ageHours = (Date.now() - publishedAt.getTime()) / (1000 * 60 * 60);
-
+        
         const estimatedScore = Math.max(150, 400 - Math.floor(ageHours * 20));
         const estimatedComments = Math.floor(Math.random() * 150) + 30;
-
+        
         const velocity = (estimatedScore + estimatedComments * 2) / Math.max(ageHours, 0.1);
 
         stories.push({
@@ -107,7 +107,7 @@ export class BBCScraper {
 
   public async scrape(): Promise<StoryResult[]> {
     console.log(`[BBC] Scraping ${this.config.categories.length} categories...`);
-
+    
     const allStories: StoryResult[] = [];
 
     for (const category of this.config.categories) {

@@ -139,20 +139,6 @@ export interface VelocityMetrics {
 }
 
 /**
- * Reddit post structure (from RSS)
- */
-export interface RedditPost {
-  title: string;
-  url: string;
-  author: string;
-  score: number;
-  numComments: number;
-  created: Date;
-  subreddit: string;
-  thumbnail?: string;
-}
-
-/**
  * YouTube video structure (from RSS)
  */
 export interface YouTubeVideo {
@@ -228,6 +214,7 @@ export interface AttributionText {
 export interface VoiceConfig {
   length: 'tweet' | 'short' | 'medium' | 'long';
   platform: 'facebook' | 'linkedin' | 'newsletter' | 'blog';
+  style?: 'conversational' | 'academic';
   angle?: string;
   tone: {
     humor: number;
