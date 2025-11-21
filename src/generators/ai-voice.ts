@@ -203,10 +203,11 @@ Write the complete article now:`;
 - Write like you're talking to a smart friend over coffee
 - Use "I" and "you" freely
 - Keep sentences crisp and punchy
-- Use phrases like "Here's the thing", "Let me break this down", "And here's the kicker"
-- Be direct and relatable
+- Vary your openings - avoid repetitive phrases or formulaic starts
+- Be direct and relatable, but change up your approach each time
 - It's okay to be a little dramatic for emphasis
-- Use occasional humor, but stay grounded in facts`;
+- Use occasional humor, but stay grounded in facts
+- IMPORTANT: Each article should feel fresh and unique, not templated`;
   }
 
   /**
