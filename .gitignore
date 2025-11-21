@@ -38,6 +38,9 @@ drafts/*.md
 # Exports (generated files)
 exports/
 
+# Voice profiles (personal)
+voices/
+
 # Scan results (temporary)
 scan_results.json
 

@@ -12,6 +12,7 @@
     "batch": "tsx src/batch-command.ts batch",
     "export": "tsx src/export-command.ts export",
     "tags": "tsx src/tags-command.ts",
+    "voice": "tsx src/voice-command.ts",
     "test": "jest",
     "type-check": "tsc --noEmit",
     "verify": "node verify.js",

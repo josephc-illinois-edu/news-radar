@@ -14,6 +14,7 @@ import { createAIVoiceGenerator } from './generators/ai-voice.js';
 import { createContentFetcher } from './utils/content-fetcher.js';
 import { createPlagiarismChecker } from './utils/plagiarism-checker.js';
 import { createDatabaseService } from './services/database.js';
+import { generateVoiceInstructions, type VoiceProfile } from './utils/voice-analyzer.js';
 import type { StoryResult, VoiceConfig } from './types.js';
 import type { FetchedContent } from './utils/content-fetcher.js';
 
@@ -33,6 +34,7 @@ interface WriteOptions {
   criticism?: number;
   preview?: boolean;
   save?: boolean;
+  voice?: string;
 }
 
 /**
@@ -61,6 +63,26 @@ async function executeWrite(options: WriteOptions): Promise<void> {
 
   try {
     // Create AI voice generator with tone settings
+    // Load voice profile if specified
+    let voiceProfile: VoiceProfile | null = null;
+    let voiceInstructions: string | null = null;
+
+    if (options.voice) {
+      try {
+        const voicePath = `voices/${options.voice}.json`;
+        const voiceContent = await fs.readFile(voicePath, 'utf-8');
+        voiceProfile = JSON.parse(voiceContent);
+        voiceInstructions = generateVoiceInstructions(voiceProfile);
+        spinner.succeed(chalk.green(`Loaded voice profile: ${voiceProfile.name}`));
+        console.log(chalk.dim(`Voice: ${voiceInstructions.slice(0, 150)}...`));
+        spinner.start('Initializing AI generator...');
+      } catch (error) {
+        spinner.fail(chalk.red(`Voice profile "${options.voice}" not found`));
+        console.log(chalk.gray('\nTip: Use "npm run voice list" to see available voices\n'));
+        process.exit(1);
+      }
+    }
+
     const config: Partial<VoiceConfig> = {
       length: options.length,
       platform: options.platform,
@@ -391,6 +413,7 @@ const writeCommand = new Command('write')
   .option('-l, --length <length>', 'Article length (tweet, short, medium, long)', 'medium')
   .option('-p, --platform <platform>', 'Target platform (facebook, linkedin, newsletter, blog)', 'newsletter')
   .option('--style <style>', 'Writing style (conversational, academic)', 'conversational')
+  .option('--voice <name>', 'Use trained voice profile (see: npm run voice list)')
   .option('--preview', 'Preview extracted content and confirm before using API credits')
   .option('--save', 'Save article to Supabase database (enabled by default)', true)
   .option('--no-save', 'Skip saving to database')
@@ -406,6 +429,7 @@ const writeCommand = new Command('write')
       length: (cmdOptions.length as WriteOptions['length']) || 'medium',
       platform: (cmdOptions.platform as WriteOptions['platform']) || 'newsletter',
       style: (cmdOptions.style as WriteOptions['style']) || 'conversational',
+      voice: cmdOptions.voice as string | undefined,
       preview: cmdOptions.preview as boolean || false,
       save: cmdOptions.save !== false, // Enabled by default unless --no-save is used
       output: cmdOptions.output as string | undefined,
