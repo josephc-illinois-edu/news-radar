@@ -41,6 +41,9 @@ exports/
 # Voice profiles (personal)
 voices/
 
+# Publisher credentials (sensitive)
+.publisher-config.json
+
 # Scan results (temporary)
 scan_results.json
 
