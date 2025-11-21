@@ -50,33 +50,67 @@ function getStatusBadge(status: string): string {
 async function listArticles(options: {
   status?: 'draft' | 'published' | 'archived';
   limit?: number;
+  tag?: string;
 }): Promise<void> {
   const spinner = ora('Loading articles from database...').start();
 
   try {
     const dbService = createDatabaseService();
-    const articles = await dbService.listArticles({
-      status: options.status,
-      limit: options.limit || 20,
-    });
+    let articles;
+    let tagName;
+
+    // Filter by tag if specified
+    if (options.tag) {
+      const tag = await dbService.getTag(options.tag);
+      if (!tag) {
+        spinner.fail(chalk.red(`Tag "${options.tag}" not found`));
+        console.log(chalk.gray('\nTip: Use "npm run tags list" to see all tags\n'));
+        process.exit(1);
+      }
+      tagName = tag.name;
+      articles = await dbService.getArticlesByTag(tag.id, {
+        status: options.status,
+        limit: options.limit || 20,
+      });
+    } else {
+      articles = await dbService.listArticles({
+        status: options.status,
+        limit: options.limit || 20,
+      });
+    }
 
     spinner.stop();
 
     if (articles.length === 0) {
       console.log(chalk.yellow('\n📭 No articles found.'));
-      console.log(chalk.gray('\nGenerate your first article with:'));
-      console.log(chalk.cyan('  npm run write -- --url [url] --preview\n'));
+      if (options.tag || options.status) {
+        console.log(chalk.gray('\nTry removing filters or generate more articles\n'));
+      } else {
+        console.log(chalk.gray('\nGenerate your first article with:'));
+        console.log(chalk.cyan('  npm run write -- --url [url] --preview\n'));
+      }
       return;
     }
 
     console.log(chalk.bold.cyan(`\n📚 Articles (${articles.length})`));
-    if (options.status) {
-      console.log(chalk.gray(`Filtered by: ${options.status}\n`));
+    const filters = [];
+    if (options.status) filters.push(`status: ${options.status}`);
+    if (tagName) filters.push(`tag: ${tagName}`);
+    if (filters.length > 0) {
+      console.log(chalk.gray(`Filtered by: ${filters.join(', ')}\n`));
     } else {
       console.log('');
     }
 
-    articles.forEach((article, index) => {
+    // Get tags for all articles
+    const articlesWithTags = await Promise.all(
+      articles.map(async (article) => {
+        const tags = await dbService.getArticleTags(article.id);
+        return { article, tags };
+      })
+    );
+
+    articlesWithTags.forEach(({ article, tags }, index) => {
       const num = chalk.gray(`${index + 1}.`);
       const status = getStatusBadge(article.status);
       const title = chalk.white.bold(article.title);
@@ -88,13 +122,24 @@ async function listArticles(options: {
       console.log(`${num} ${status}`);
       console.log(`   ${title}`);
       console.log(`   ${meta}`);
+
+      // Show tags if any
+      if (tags.length > 0) {
+        const tagBadges = tags.map((tag) => {
+          const badge = chalk.hex(tag.color || '#3b82f6')('●');
+          return `${badge} ${tag.name}`;
+        }).join('  ');
+        console.log(chalk.gray(`   Tags: ${tagBadges}`));
+      }
+
       console.log(`   ${id}\n`);
     });
 
     console.log(chalk.gray('Commands:'));
     console.log(chalk.gray(`  npm run articles view <id>     View article details`));
     console.log(chalk.gray(`  npm run articles publish <id>  Publish a draft`));
-    console.log(chalk.gray(`  npm run articles list --status draft  Filter by status\n`));
+    console.log(chalk.gray(`  npm run articles list --status draft  Filter by status`));
+    console.log(chalk.gray(`  npm run articles list --tag <tag>     Filter by tag\n`));
   } catch (error) {
     spinner.fail(chalk.red('Failed to load articles'));
     const message = error instanceof Error ? error.message : 'Unknown error';
@@ -270,10 +315,12 @@ const articlesCommand = new Command('articles')
     new Command('list')
       .description('List all articles')
       .option('--status <status>', 'Filter by status (draft, published, archived)')
+      .option('--tag <tag>', 'Filter by tag (name or slug)')
       .option('--limit <number>', 'Maximum number of articles to show', '20')
       .action(async (options) => {
         await listArticles({
           status: options.status as 'draft' | 'published' | 'archived' | undefined,
+          tag: options.tag as string | undefined,
           limit: parseInt(options.limit, 10),
         });
       })

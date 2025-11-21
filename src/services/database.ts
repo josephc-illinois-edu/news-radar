@@ -558,6 +558,209 @@ export class DatabaseService {
 
     return dbArticle;
   }
+
+  // ==================== TAGS ====================
+
+  /**
+   * Create a new tag
+   */
+  async createTag(input: {
+    name: string;
+    description?: string;
+    color?: string;
+  }): Promise<DBTag> {
+    const slug = input.name.toLowerCase().replace(/[^\w\s-]/g, '').replace(/\s+/g, '-');
+
+    const { data, error } = await this.supabase
+      .from('tags')
+      .insert({
+        name: input.name,
+        slug,
+        description: input.description,
+        color: input.color || '#3b82f6', // Default blue
+      })
+      .select()
+      .single();
+
+    if (error) {
+      if (error.code === '23505') {
+        throw new Error(`Tag "${input.name}" already exists`);
+      }
+      throw new Error(`Failed to create tag: ${error.message}`);
+    }
+
+    return data;
+  }
+
+  /**
+   * Get tag by ID or slug
+   */
+  async getTag(idOrSlug: string): Promise<DBTag | null> {
+    // Try by ID first
+    let query = this.supabase.from('tags').select('*').eq('id', idOrSlug).single();
+    let { data, error } = await query;
+
+    // If not found, try by slug
+    if (error || !data) {
+      query = this.supabase.from('tags').select('*').eq('slug', idOrSlug).single();
+      const result = await query;
+      data = result.data;
+      error = result.error;
+    }
+
+    if (error) return null;
+    return data;
+  }
+
+  /**
+   * List all tags
+   */
+  async listTags(options?: {
+    limit?: number;
+    offset?: number;
+  }): Promise<DBTag[]> {
+    let query = this.supabase
+      .from('tags')
+      .select('*')
+      .order('name', { ascending: true });
+
+    if (options?.limit) query = query.limit(options.limit);
+    if (options?.offset) query = query.range(options.offset, options.offset + (options.limit || 20) - 1);
+
+    const { data, error } = await query;
+
+    if (error) throw new Error(`Failed to list tags: ${error.message}`);
+    return data || [];
+  }
+
+  /**
+   * Update tag
+   */
+  async updateTag(
+    id: string,
+    updates: {
+      name?: string;
+      description?: string;
+      color?: string;
+    }
+  ): Promise<DBTag> {
+    const updateData: any = { ...updates };
+
+    // Update slug if name changed
+    if (updates.name) {
+      updateData.slug = updates.name.toLowerCase().replace(/[^\w\s-]/g, '').replace(/\s+/g, '-');
+    }
+
+    const { data, error } = await this.supabase
+      .from('tags')
+      .update(updateData)
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) throw new Error(`Failed to update tag: ${error.message}`);
+    return data;
+  }
+
+  /**
+   * Delete tag
+   */
+  async deleteTag(id: string): Promise<void> {
+    const { error } = await this.supabase.from('tags').delete().eq('id', id);
+
+    if (error) throw new Error(`Failed to delete tag: ${error.message}`);
+  }
+
+  /**
+   * Add tag to article
+   */
+  async addTagToArticle(articleId: string, tagId: string): Promise<void> {
+    const { error } = await this.supabase
+      .from('article_tags')
+      .insert({
+        article_id: articleId,
+        tag_id: tagId,
+      });
+
+    if (error) {
+      if (error.code === '23505') {
+        // Already exists, ignore
+        return;
+      }
+      throw new Error(`Failed to add tag to article: ${error.message}`);
+    }
+  }
+
+  /**
+   * Remove tag from article
+   */
+  async removeTagFromArticle(articleId: string, tagId: string): Promise<void> {
+    const { error } = await this.supabase
+      .from('article_tags')
+      .delete()
+      .eq('article_id', articleId)
+      .eq('tag_id', tagId);
+
+    if (error) throw new Error(`Failed to remove tag from article: ${error.message}`);
+  }
+
+  /**
+   * Get all tags for an article
+   */
+  async getArticleTags(articleId: string): Promise<DBTag[]> {
+    const { data, error } = await this.supabase
+      .from('article_tags')
+      .select('tag_id, tags(*)')
+      .eq('article_id', articleId);
+
+    if (error) throw new Error(`Failed to get article tags: ${error.message}`);
+
+    return (data || []).map((row: any) => row.tags);
+  }
+
+  /**
+   * Get all articles with a specific tag
+   */
+  async getArticlesByTag(tagId: string, options?: {
+    status?: 'draft' | 'published' | 'archived';
+    limit?: number;
+  }): Promise<DBArticle[]> {
+    let query = this.supabase
+      .from('article_tags')
+      .select('article_id, articles(*)')
+      .eq('tag_id', tagId);
+
+    const { data, error } = await query;
+
+    if (error) throw new Error(`Failed to get articles by tag: ${error.message}`);
+
+    let articles = (data || []).map((row: any) => row.articles);
+
+    // Filter by status if specified
+    if (options?.status) {
+      articles = articles.filter((a: DBArticle) => a.status === options.status);
+    }
+
+    // Apply limit
+    if (options?.limit) {
+      articles = articles.slice(0, options.limit);
+    }
+
+    return articles;
+  }
+
+  /**
+   * Get tag usage count
+   */
+  async getTagUsageCount(tagId: string): Promise<number> {
+    const { count, error } = await this.supabase
+      .from('article_tags')
+      .select('*', { count: 'exact', head: true })
+      .eq('tag_id', tagId);
+
+    if (error) throw new Error(`Failed to get tag usage count: ${error.message}`);
+    return count || 0;
+  }
 }
 
 /**
