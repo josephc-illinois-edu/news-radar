@@ -210,6 +210,12 @@ export function generateVoiceInstructions(profile: VoiceProfile): string {
     instructions.push('Include subtle humor and wit where appropriate.');
   }
 
+  // Regional/Cultural (American default)
+  instructions.push('IMPORTANT: Write from an American perspective using American English.');
+  instructions.push('Use American measurements (pounds, feet, inches, miles) - never use stone, metres, or kilometres.');
+  instructions.push('Use American spelling (color not colour, realize not realise, etc).');
+  instructions.push('Reference American cultural context and idioms where relevant.');
+
   return instructions.join(' ');
 }
 

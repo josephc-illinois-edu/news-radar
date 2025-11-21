@@ -3,9 +3,9 @@
  * @description Uses Claude API to generate thoughtful articles in Joseph's voice
  */
 
-import Anthropic from '@anthropic-ai/sdk';
-import type { StoryResult, VoiceConfig, GeneratedArticle } from '../types.js';
-import type { FetchedContent } from '../utils/content-fetcher.js';
+import Anthropic from "@anthropic-ai/sdk";
+import type { StoryResult, VoiceConfig, GeneratedArticle } from "../types.js";
+import type { FetchedContent } from "../utils/content-fetcher.js";
 
 /**
  * AI Voice Generator using Claude
@@ -19,8 +19,8 @@ export class AIVoiceGenerator {
 
     if (!apiKey) {
       throw new Error(
-        'ANTHROPIC_API_KEY not found in environment variables. ' +
-        'Get your API key at https://console.anthropic.com/ and add it to your .env file.'
+        "ANTHROPIC_API_KEY not found in environment variables. " +
+          "Get your API key at https://console.anthropic.com/ and add it to your .env file."
       );
     }
 
@@ -29,9 +29,9 @@ export class AIVoiceGenerator {
     });
 
     this.config = {
-      length: config.length ?? 'medium',
-      platform: config.platform ?? 'newsletter',
-      style: config.style ?? 'conversational',
+      length: config.length ?? "medium",
+      platform: config.platform ?? "newsletter",
+      style: config.style ?? "conversational",
       angle: config.angle,
       tone: {
         humor: config.tone?.humor ?? 4,
@@ -46,22 +46,26 @@ export class AIVoiceGenerator {
   /**
    * Generate article using Claude
    */
-  async generate(story: StoryResult, fetchedContent?: FetchedContent): Promise<GeneratedArticle> {
+  async generate(
+    story: StoryResult,
+    fetchedContent?: FetchedContent
+  ): Promise<GeneratedArticle> {
     const prompt = this.buildPrompt(story, fetchedContent);
 
     try {
       const message = await this.anthropic.messages.create({
-        model: 'claude-sonnet-4-20250514',
+        model: "claude-sonnet-4-20250514",
         max_tokens: this.getMaxTokens(),
         messages: [
           {
-            role: 'user',
+            role: "user",
             content: prompt,
           },
         ],
       });
 
-      const content = message.content[0].type === 'text' ? message.content[0].text : '';
+      const content =
+        message.content[0].type === "text" ? message.content[0].text : "";
 
       const wordCount = content.split(/\s+/).length;
       const citations = this.formatCitations(story, fetchedContent);
@@ -75,7 +79,6 @@ export class AIVoiceGenerator {
         suggestedHashtags: this.generateHashtags(story),
         platform: this.config.platform,
       };
-
     } catch (error) {
       if (error instanceof Error) {
         throw new Error(`AI generation failed: ${error.message}`);
@@ -87,7 +90,10 @@ export class AIVoiceGenerator {
   /**
    * Build prompt for Claude based on story and style
    */
-  private buildPrompt(story: StoryResult, fetchedContent?: FetchedContent): string {
+  private buildPrompt(
+    story: StoryResult,
+    fetchedContent?: FetchedContent
+  ): string {
     const styleGuide = this.getStyleGuide();
     const lengthGuide = this.getLengthGuide();
     const toneGuide = this.getToneGuide();
@@ -128,15 +134,29 @@ COMBINED ARTICLE CONTENT:
 ${fetchedContent.content.slice(0, 8000)}
 
 KEY FACTS FROM ALL SOURCES:
-${fetchedContent.facts.slice(0, 12).map((f, i) => `${i + 1}. ${f}`).join('\n')}
+${fetchedContent.facts
+  .slice(0, 12)
+  .map((f, i) => `${i + 1}. ${f}`)
+  .join("\n")}
 
-${fetchedContent.quotes.length > 0 ? `KEY QUOTES FROM SOURCES:
-${fetchedContent.quotes.slice(0, 5).map((q, i) => `${i + 1}. "${q}"`).join('\n')}
-` : ''}
+${
+  fetchedContent.quotes.length > 0
+    ? `KEY QUOTES FROM SOURCES:
+${fetchedContent.quotes
+  .slice(0, 5)
+  .map((q, i) => `${i + 1}. "${q}"`)
+  .join("\n")}
+`
+    : ""
+}
 
-${fetchedContent.numbers.length > 0 ? `KEY STATISTICS:
-${fetchedContent.numbers.slice(0, 10).join(', ')}
-` : ''}
+${
+  fetchedContent.numbers.length > 0
+    ? `KEY STATISTICS:
+${fetchedContent.numbers.slice(0, 10).join(", ")}
+`
+    : ""
+}
 
 IMPORTANT: Look for different perspectives, contradictions, or complementary information across sources. Synthesize these into a cohesive analysis.
 `;
@@ -146,15 +166,29 @@ ARTICLE CONTENT TO ANALYZE:
 ${fetchedContent.content.slice(0, 8000)}
 
 KEY FACTS FROM SOURCE:
-${fetchedContent.facts.slice(0, 8).map((f, i) => `${i + 1}. ${f}`).join('\n')}
+${fetchedContent.facts
+  .slice(0, 8)
+  .map((f, i) => `${i + 1}. ${f}`)
+  .join("\n")}
 
-${fetchedContent.quotes.length > 0 ? `KEY QUOTES:
-${fetchedContent.quotes.slice(0, 3).map((q, i) => `${i + 1}. "${q}"`).join('\n')}
-` : ''}
+${
+  fetchedContent.quotes.length > 0
+    ? `KEY QUOTES:
+${fetchedContent.quotes
+  .slice(0, 3)
+  .map((q, i) => `${i + 1}. "${q}"`)
+  .join("\n")}
+`
+    : ""
+}
 
-${fetchedContent.numbers.length > 0 ? `KEY STATISTICS:
-${fetchedContent.numbers.slice(0, 8).join(', ')}
-` : ''}
+${
+  fetchedContent.numbers.length > 0
+    ? `KEY STATISTICS:
+${fetchedContent.numbers.slice(0, 8).join(", ")}
+`
+    : ""
+}
 `;
       }
     } else {
@@ -189,7 +223,7 @@ Write the complete article now:`;
    * Get style guide based on configuration
    */
   private getStyleGuide(): string {
-    if (this.config.style === 'academic') {
+    if (this.config.style === "academic") {
       return `WRITING STYLE: Academic/Formal
 - Use sophisticated vocabulary and complex sentence structures
 - Reference broader concepts (historical patterns, institutional behavior, systemic issues)
@@ -216,34 +250,43 @@ Write the complete article now:`;
   private getToneGuide(): string {
     const { humor, urgency, optimism, criticism } = this.config.tone;
 
-    let guide = 'TONE SETTINGS:\n';
+    let guide = "TONE SETTINGS:\n";
 
     if (urgency > 7) {
-      guide += '- HIGH URGENCY: This matters NOW. Make readers feel the importance and timeliness.\n';
+      guide +=
+        "- HIGH URGENCY: This matters NOW. Make readers feel the importance and timeliness.\n";
     } else if (urgency > 5) {
-      guide += '- MODERATE URGENCY: Important but not panic-inducing. Thoughtful concern.\n';
+      guide +=
+        "- MODERATE URGENCY: Important but not panic-inducing. Thoughtful concern.\n";
     } else {
-      guide += '- LOW URGENCY: Take your time. This is about understanding, not reacting.\n';
+      guide +=
+        "- LOW URGENCY: Take your time. This is about understanding, not reacting.\n";
     }
 
     if (optimism > 6) {
-      guide += '- OPTIMISTIC: Find the silver lining. Show how this could lead to positive change.\n';
+      guide +=
+        "- OPTIMISTIC: Find the silver lining. Show how this could lead to positive change.\n";
     } else if (optimism < 4) {
-      guide += '- REALISTIC/SKEPTICAL: Don\'t sugarcoat. Call out problems honestly.\n';
+      guide +=
+        "- REALISTIC/SKEPTICAL: Don't sugarcoat. Call out problems honestly.\n";
     } else {
-      guide += '- BALANCED: Present both concerns and opportunities.\n';
+      guide += "- BALANCED: Present both concerns and opportunities.\n";
     }
 
     if (criticism > 6) {
-      guide += '- CRITICAL: Don\'t hold back on calling out problems, failures, or bad actors.\n';
+      guide +=
+        "- CRITICAL: Don't hold back on calling out problems, failures, or bad actors.\n";
     } else if (criticism < 4) {
-      guide += '- MEASURED: Be fair. Acknowledge complexity and competing interests.\n';
+      guide +=
+        "- MEASURED: Be fair. Acknowledge complexity and competing interests.\n";
     }
 
     if (humor > 5) {
-      guide += '- HUMOR: Use wit and occasional sarcasm, but don\'t undercut serious points.\n';
+      guide +=
+        "- HUMOR: Use wit and occasional sarcasm, but don't undercut serious points.\n";
     } else if (humor > 2) {
-      guide += '- LIGHT HUMOR: A wry observation here and there, but mostly serious.\n';
+      guide +=
+        "- LIGHT HUMOR: A wry observation here and there, but mostly serious.\n";
     }
 
     return guide;
@@ -253,11 +296,14 @@ Write the complete article now:`;
    * Get length guide based on configuration
    */
   private getLengthGuide(): string {
-    const guides: Record<VoiceConfig['length'], string> = {
-      tweet: 'TARGET LENGTH: Tweet-length (240-280 characters). ONE punchy take.',
-      short: 'TARGET LENGTH: Short-form (200-400 words). Quick read, one main point.',
-      medium: 'TARGET LENGTH: Medium-form (500-800 words). Develop 2-3 key points with analysis.',
-      long: 'TARGET LENGTH: Long-form (1000-1500 words). Deep dive with multiple angles and implications.',
+    const guides: Record<VoiceConfig["length"], string> = {
+      tweet:
+        "TARGET LENGTH: Tweet-length (240-280 characters). ONE punchy take.",
+      short:
+        "TARGET LENGTH: Short-form (200-400 words). Quick read, one main point.",
+      medium:
+        "TARGET LENGTH: Medium-form (500-800 words). Develop 2-3 key points with analysis.",
+      long: "TARGET LENGTH: Long-form (1000-1500 words). Deep dive with multiple angles and implications.",
     };
 
     return guides[this.config.length];
@@ -267,7 +313,7 @@ Write the complete article now:`;
    * Get max tokens based on length
    */
   private getMaxTokens(): number {
-    const tokens: Record<VoiceConfig['length'], number> = {
+    const tokens: Record<VoiceConfig["length"], number> = {
       tweet: 150,
       short: 600,
       medium: 1200,
@@ -288,22 +334,29 @@ Write the complete article now:`;
   /**
    * Format article with citations
    */
-  private formatArticle(content: string, citations: string[], story: StoryResult): string {
+  private formatArticle(
+    content: string,
+    citations: string[],
+    story: StoryResult
+  ): string {
     return `${content}
 
 ---
 
 **Sources:**
-${citations.join('\n')}
+${citations.join("\n")}
 
-**Written by:** Joseph C | ${new Date().toLocaleDateString()}
-**From News Radar:** AI-powered emerging story analysis`;
+**Written by:** Joe Chrisman | ${new Date().toLocaleDateString()}
+**From News Radar:** An app helping you stay ahead of the news cycle.`;
   }
 
   /**
    * Format citations
    */
-  private formatCitations(story: StoryResult, fetchedContent?: FetchedContent): string[] {
+  private formatCitations(
+    story: StoryResult,
+    fetchedContent?: FetchedContent
+  ): string[] {
     const citations = [`- [${story.title}](${story.url})`];
 
     if (fetchedContent?.author) {
@@ -311,14 +364,20 @@ ${citations.join('\n')}
     }
 
     if (fetchedContent?.publishedDate) {
-      citations.push(`- Published: ${fetchedContent.publishedDate.toLocaleDateString()}`);
+      citations.push(
+        `- Published: ${fetchedContent.publishedDate.toLocaleDateString()}`
+      );
     } else {
       citations.push(`- Source: ${story.sourceName}`);
     }
 
-    const hoursAgo = Math.round((Date.now() - story.detectedAt.getTime()) / (1000 * 60 * 60));
+    const hoursAgo = Math.round(
+      (Date.now() - story.detectedAt.getTime()) / (1000 * 60 * 60)
+    );
     if (hoursAgo > 0) {
-      citations.push(`- Detected: ${hoursAgo} hours before mainstream coverage`);
+      citations.push(
+        `- Detected: ${hoursAgo} hours before mainstream coverage`
+      );
     }
 
     return citations;
@@ -330,14 +389,25 @@ ${citations.join('\n')}
   private generateHashtags(story: StoryResult): string[] {
     return story.keywords
       .slice(0, 5)
-      .map(kw => `#${kw.charAt(0).toUpperCase() + kw.slice(1).toLowerCase().replace(/[^a-z0-9]/gi, '')}`)
-      .filter(tag => tag.length > 2);
+      .map(
+        (kw) =>
+          `#${
+            kw.charAt(0).toUpperCase() +
+            kw
+              .slice(1)
+              .toLowerCase()
+              .replace(/[^a-z0-9]/gi, "")
+          }`
+      )
+      .filter((tag) => tag.length > 2);
   }
 }
 
 /**
  * Create AI voice generator instance
  */
-export function createAIVoiceGenerator(config?: Partial<VoiceConfig>): AIVoiceGenerator {
+export function createAIVoiceGenerator(
+  config?: Partial<VoiceConfig>
+): AIVoiceGenerator {
   return new AIVoiceGenerator(config);
 }
