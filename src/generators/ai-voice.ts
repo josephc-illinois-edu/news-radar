@@ -72,7 +72,7 @@ export class AIVoiceGenerator {
 
       return {
         title: this.extractTitle(content) || story.title,
-        content: this.formatArticle(content, citations, story),
+        content: this.formatArticle(content, citations),
         wordCount,
         readingTimeMinutes: Math.ceil(wordCount / 200),
         citations,
@@ -334,11 +334,7 @@ Write the complete article now:`;
   /**
    * Format article with citations
    */
-  private formatArticle(
-    content: string,
-    citations: string[],
-    story: StoryResult
-  ): string {
+  private formatArticle(content: string, citations: string[]): string {
     return `${content}
 
 ---
