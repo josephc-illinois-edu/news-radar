@@ -15,6 +15,8 @@ import { createContentFetcher } from './utils/content-fetcher.js';
 import { createPlagiarismChecker } from './utils/plagiarism-checker.js';
 import { createDatabaseService } from './services/database.js';
 import { generateVoiceInstructions, type VoiceProfile } from './utils/voice-analyzer.js';
+import { getRandomAngles, buildVariationPrompt, createVariationMetadata, type VariationAngle } from './utils/variation-generator.js';
+import prompts from 'prompts';
 import type { StoryResult, VoiceConfig } from './types.js';
 import type { FetchedContent } from './utils/content-fetcher.js';
 
@@ -35,6 +37,111 @@ interface WriteOptions {
   preview?: boolean;
   save?: boolean;
   voice?: string;
+  variations?: number;
+}
+
+/**
+ * Generate multiple article variations
+ */
+async function generateVariations(
+  count: number,
+  baseOptions: WriteOptions,
+  mockStory: StoryResult,
+  combinedContent: FetchedContent | null,
+  voiceProfile: VoiceProfile | null,
+  voiceInstructions: string | null
+): Promise<Array<{ article: any; angle: VariationAngle; metadata: any }>> {
+  const spinner = ora(`Generating ${count} variations with different angles...`).start();
+
+  try {
+    // Get random angles for variations
+    const angles = getRandomAngles(count);
+    const variations: Array<{ article: any; angle: VariationAngle; metadata: any }> = [];
+
+    // Generate each variation
+    for (let i = 0; i < count; i++) {
+      const angle = angles[i];
+      spinner.text = `Generating variation ${i + 1}/${count}: ${angle.name}...`;
+
+      // Build variation-specific prompt
+      const variationPrompt = buildVariationPrompt(angle, voiceInstructions || undefined);
+
+      // Create config for this variation
+      const config: Partial<VoiceConfig> = {
+        length: baseOptions.length,
+        platform: baseOptions.platform,
+        style: baseOptions.style,
+        tone: {
+          humor: baseOptions.humor ?? 4,
+          urgency: baseOptions.urgency ?? 7,
+          optimism: baseOptions.optimism ?? 6,
+          criticism: baseOptions.criticism ?? 5,
+        },
+        voiceInstructions: variationPrompt,
+      };
+
+      const generator = createAIVoiceGenerator(config);
+      const article = await generator.generate(mockStory, combinedContent);
+
+      // Create metadata
+      const metadata = createVariationMetadata(i + 1, count, angle);
+
+      variations.push({ article, angle, metadata });
+    }
+
+    spinner.succeed(chalk.green(`✨ Generated ${count} variations successfully!`));
+    return variations;
+  } catch (error) {
+    spinner.fail(chalk.red('Failed to generate variations'));
+    throw error;
+  }
+}
+
+/**
+ * Display comparison table of variations
+ */
+function displayVariationComparison(variations: Array<{ article: any; angle: VariationAngle; metadata: any }>) {
+  console.log('\n' + chalk.bold.cyan('═'.repeat(80)));
+  console.log(chalk.bold.white('  VARIATION COMPARISON'));
+  console.log(chalk.bold.cyan('═'.repeat(80)));
+
+  variations.forEach(({ article, angle, metadata }, index) => {
+    console.log(chalk.bold.yellow(`\n[${index + 1}] ${angle.name.toUpperCase()}`));
+    console.log(chalk.dim(angle.description));
+    console.log(chalk.white(`\nTitle: ${article.title}`));
+    console.log(chalk.dim(`Words: ${article.stats.words} | Reading time: ${article.stats.readingTime}`));
+
+    // Show first 200 characters of content
+    const preview = article.content.substring(0, 200).replace(/\n/g, ' ');
+    console.log(chalk.gray(`\nPreview: ${preview}...`));
+    console.log(chalk.cyan('─'.repeat(80)));
+  });
+
+  console.log('\n');
+}
+
+/**
+ * Let user select which variation(s) to save
+ */
+async function selectVariations(count: number): Promise<number[]> {
+  const choices = [];
+  for (let i = 0; i < count; i++) {
+    choices.push({ title: `Variation ${i + 1}`, value: i });
+  }
+
+  const response = await prompts({
+    type: 'multiselect',
+    name: 'selected',
+    message: 'Select which variation(s) to save (Space to select, Enter to confirm):',
+    choices,
+    min: 1,
+  });
+
+  if (!response.selected || response.selected.length === 0) {
+    throw new Error('No variations selected');
+  }
+
+  return response.selected;
 }
 
 /**
@@ -281,6 +388,83 @@ async function executeWrite(options: WriteOptions): Promise<void> {
       spinner.start('User confirmed. Generating article...');
     }
 
+    // Check if generating multiple variations
+    const variationCount = Math.min(Math.max(parseInt(String(options.variations || 1)), 1), 5);
+
+    if (variationCount > 1) {
+      // Generate multiple variations
+      console.log(chalk.bold.cyan(`\n📝 Generating ${variationCount} variations with different angles...\n`));
+
+      const variations = await generateVariations(
+        variationCount,
+        options,
+        mockStory,
+        combinedContent,
+        voiceProfile,
+        voiceInstructions
+      );
+
+      // Display comparison
+      displayVariationComparison(variations);
+
+      // Let user select which to save
+      const selectedIndices = await selectVariations(variationCount);
+
+      // Process each selected variation
+      for (const index of selectedIndices) {
+        const { article, angle, metadata } = variations[index];
+
+        console.log(chalk.bold.cyan(`\n📄 Processing variation ${index + 1}: ${angle.name}`));
+
+        // Run plagiarism check
+        if (combinedContent) {
+          const plagiarismSpinner = ora('Running plagiarism check...').start();
+          const plagiarismChecker = createPlagiarismChecker();
+          const plagiarismResult = plagiarismChecker.check(article.content, combinedContent.content);
+          plagiarismSpinner.succeed(chalk.green('Plagiarism check completed!'));
+          console.log(chalk.cyan(plagiarismChecker.generateReport(plagiarismResult)));
+        }
+
+        // Save to database if enabled
+        if (options.save) {
+          const saveSpinner = ora('Saving to database...').start();
+          try {
+            const dbService = createDatabaseService();
+            const dbArticle = await dbService.saveArticleWithSources(
+              article,
+              fetchedContents,
+              {
+                length: options.length,
+                platform: options.platform,
+                style: options.style,
+                tone: {
+                  humor: options.humor ?? 4,
+                  urgency: options.urgency ?? 7,
+                  optimism: options.optimism ?? 6,
+                  criticism: options.criticism ?? 5,
+                },
+              }
+            );
+            saveSpinner.succeed(chalk.green(`✓ Saved to database (ID: ${dbArticle.id})`));
+          } catch (error) {
+            saveSpinner.warn(chalk.yellow('Could not save to database'));
+            const message = error instanceof Error ? error.message : 'Unknown error';
+            console.log(chalk.yellow(`⚠ ${message}`));
+          }
+        }
+
+        // Save to file
+        const filename = `${article.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').substring(0, 50)}-v${index + 1}.md`;
+        const filepath = `drafts/${new Date().toISOString().split('T')[0]}-${filename}`;
+        await fs.writeFile(filepath, article.content);
+        console.log(chalk.green(`✓ Saved to: ${filepath}`));
+      }
+
+      console.log(chalk.green(`\n✨ ${selectedIndices.length} variation(s) saved successfully!\n`));
+      return;
+    }
+
+    // Single article generation (original flow)
     spinner.text = `Generating article with AI in your ${options.style} voice...`;
     if (fetchedContents.length > 1) {
       console.log(chalk.gray(`\n(Synthesizing insights from ${fetchedContents.length} sources...)\n`));
@@ -415,6 +599,7 @@ const writeCommand = new Command('write')
   .option('-p, --platform <platform>', 'Target platform (facebook, linkedin, newsletter, blog)', 'newsletter')
   .option('--style <style>', 'Writing style (conversational, academic)', 'conversational')
   .option('--voice <name>', 'Use trained voice profile (see: npm run voice list)')
+  .option('--variations <number>', 'Generate N variations with different angles (2-5)', '1')
   .option('--preview', 'Preview extracted content and confirm before using API credits')
   .option('--save', 'Save article to Supabase database (enabled by default)', true)
   .option('--no-save', 'Skip saving to database')
