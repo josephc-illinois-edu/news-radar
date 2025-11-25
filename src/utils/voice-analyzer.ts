@@ -216,6 +216,15 @@ export function generateVoiceInstructions(profile: VoiceProfile): string {
   instructions.push('Use American spelling (color not colour, realize not realise, etc).');
   instructions.push('Reference American cultural context and idioms where relevant.');
 
+  // Anti-Pattern Instructions (Combat Formulaic Writing)
+  instructions.push('CRITICAL: Avoid formulaic patterns and repetitive structures.');
+  instructions.push('BANNED PHRASES: Never use "honestly", "here\'s the thing", "let me walk you through", "let me paint you the picture".');
+  instructions.push('OPENING VARIATION: Do NOT start with "You know...", "Somewhere in America...", or scene-setting clichés. Vary your openings: start mid-action, with a quote, a statistic, historical context, or just dive straight in.');
+  instructions.push('ENDING VARIATION: Do NOT always end with a provocative question to the reader. Mix it up: end with a fact, a prediction, an anecdote, abruptly, or with silence.');
+  instructions.push('SECTION HEADERS: If you use headers, vary the style - mix questions, single words, long descriptive headers, or skip them entirely. Don\'t use the same punchy 2-4 word formula every time.');
+  instructions.push('ARGUMENT STRUCTURE: Do NOT follow the same template (hook → personal reaction → context → stats → bigger picture → question). Vary your structure: try chronological, problem-solution, compare-contrast, inverted pyramid, or mystery reveal.');
+  instructions.push('Each article should feel architecturally different from the last, even while maintaining the same voice and personality.');
+
   return instructions.join(' ');
 }
 
