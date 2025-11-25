@@ -5,9 +5,40 @@ All notable changes to News Radar will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.2.0] - 2025-11-21
+## [0.2.0] - 2025-11-25
 
 ### Added
+
+**Voice Training & Management**
+- Voice training system to learn personal writing style from samples
+- Train custom voice profiles: `npm run voice train <name>`
+- Compare multiple voices side-by-side: `npm run voice compare voice1 voice2`
+- Anti-pattern instructions to combat formulaic writing
+- Voice profiles include: sentence structure, formality, POV, signature phrases
+- American English instructions (measurements, spelling, idioms)
+
+**Multiple Draft Variations**
+- Generate 2-5 variations of same article with different angles
+- 5 distinct angles: Balanced, Provocative, Human Interest, Deep Analysis, Satirical
+- Interactive comparison table showing all variations
+- Multi-select interface to choose which to save
+- Each variation commits fully to its angle for distinct articles
+
+**Direct Publishing Integration**
+- Facebook Graph API integration (pages & profiles, scheduling support)
+- LinkedIn UGC Post API integration (personal profiles)
+- Secure credential management (`.publisher-config.json`, gitignored)
+- Multi-platform publishing (publish to multiple platforms simultaneously)
+- Scheduled publishing (Facebook only)
+- Commands: `npm run publish config/list/publish`
+
+**Content Quality Validation**
+- Minimum content threshold checks (3+ facts OR 2+ quotes OR 300+ words)
+- Fail fast on paywalled/blocked sources instead of generating generic content
+- Clear error messages with actionable suggestions
+- Shows quality metrics: "5 facts, 3 quotes, 847 words"
+- Prevents "emerging-story" generic titles and vapid content
+
 - **Supabase Database Integration** - Complete PostgreSQL database for article management
 - **Database Schema** - 7 tables: articles, users, sources, revisions, tags, article_tags, analytics_events
 - **Automatic Article Saving** - Articles saved to database by default after generation
