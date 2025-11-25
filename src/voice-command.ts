@@ -248,6 +248,108 @@ async function showVoice(name: string): Promise<void> {
 }
 
 /**
+ * Compare multiple voice profiles side-by-side
+ */
+async function compareVoices(names: string[]): Promise<void> {
+  console.log(chalk.bold.cyan('\n📊 VOICE COMPARISON\n'));
+
+  if (names.length < 2) {
+    console.log(chalk.red('Please provide at least 2 voice names to compare\n'));
+    console.log(chalk.gray('Example: npm run voice compare casual-facebook professional-linkedin\n'));
+    process.exit(1);
+  }
+
+  try {
+    // Load all voice profiles
+    const profiles: Array<{ name: string; profile: VoiceProfile }> = [];
+
+    for (const name of names) {
+      const voicePath = `${VOICES_DIR}/${name}.json`;
+      try {
+        const content = await fs.readFile(voicePath, 'utf-8');
+        const profile: VoiceProfile = JSON.parse(content);
+        profiles.push({ name, profile });
+      } catch (error) {
+        console.log(chalk.red(`✖ Voice "${name}" not found`));
+      }
+    }
+
+    if (profiles.length < 2) {
+      console.log(chalk.yellow('\n⚠ Need at least 2 valid voices to compare\n'));
+      process.exit(1);
+    }
+
+    // Display comparison table
+    console.log(chalk.bold.white('Voice Profiles:'));
+    profiles.forEach(({ name, profile }) => {
+      console.log(chalk.cyan(`  • ${name}`) + chalk.gray(` - ${profile.description || 'No description'}`));
+    });
+
+    console.log(chalk.bold.white('\n📏 Writing Metrics:\n'));
+
+    // Sentence length comparison
+    console.log(chalk.white('Average Sentence Length:'));
+    profiles.forEach(({ name, profile }) => {
+      const bar = '█'.repeat(Math.round(profile.avg_sentence_length / 2));
+      console.log(`  ${chalk.cyan(name.padEnd(25))} ${chalk.yellow(Math.round(profile.avg_sentence_length).toString().padStart(3))} words ${chalk.dim(bar)}`);
+    });
+
+    // Formality comparison
+    console.log(chalk.white('\nFormality Score (0-10):'));
+    profiles.forEach(({ name, profile }) => {
+      const bar = '█'.repeat(Math.round(profile.formality_score));
+      const score = profile.formality_score.toFixed(1);
+      console.log(`  ${chalk.cyan(name.padEnd(25))} ${chalk.yellow(score.padStart(4))}/10   ${chalk.dim(bar)}`);
+    });
+
+    // Reading level comparison
+    console.log(chalk.white('\nReading Level:'));
+    profiles.forEach(({ name, profile }) => {
+      console.log(`  ${chalk.cyan(name.padEnd(25))} ${chalk.yellow(profile.stats.reading_level)}`);
+    });
+
+    // Voice markers
+    console.log(chalk.bold.white('\n🎯 Voice Markers:\n'));
+
+    console.log(chalk.white('Contractions:'));
+    profiles.forEach(({ name, profile }) => {
+      const marker = profile.uses_contractions ? '✓' : '✗';
+      const color = profile.uses_contractions ? chalk.green : chalk.gray;
+      console.log(`  ${chalk.cyan(name.padEnd(25))} ${color(marker)}`);
+    });
+
+    console.log(chalk.white('\nFirst Person:'));
+    profiles.forEach(({ name, profile }) => {
+      const marker = profile.uses_first_person ? '✓' : '✗';
+      const color = profile.uses_first_person ? chalk.green : chalk.gray;
+      console.log(`  ${chalk.cyan(name.padEnd(25))} ${color(marker)}`);
+    });
+
+    console.log(chalk.white('\nSecond Person:'));
+    profiles.forEach(({ name, profile }) => {
+      const marker = profile.uses_second_person ? '✓' : '✗';
+      const color = profile.uses_second_person ? chalk.green : chalk.gray;
+      console.log(`  ${chalk.cyan(name.padEnd(25))} ${color(marker)}`);
+    });
+
+    // Signature phrases
+    console.log(chalk.bold.white('\n💬 Signature Phrases:\n'));
+    profiles.forEach(({ name, profile }) => {
+      console.log(chalk.cyan(`${name}:`));
+      const phrases = profile.signature_phrases.slice(0, 3).join(', ');
+      console.log(chalk.gray(`  ${phrases}`));
+    });
+
+    console.log();
+  } catch (error) {
+    console.error(chalk.red('\n❌ Error comparing voices\n'));
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    console.error(chalk.gray(message));
+    process.exit(1);
+  }
+}
+
+/**
  * Delete voice profile
  */
 async function deleteVoice(name: string): Promise<void> {
@@ -323,6 +425,12 @@ program
   .command('delete <name>')
   .description('Delete a voice profile')
   .action(deleteVoice);
+
+// Compare command
+program
+  .command('compare <names...>')
+  .description('Compare multiple voice profiles side-by-side')
+  .action(compareVoices);
 
 // Default to list if no command
 if (process.argv.length === 2) {
