@@ -91,11 +91,7 @@ async function createTag(
 
   try {
     const dbService = createDatabaseService();
-    const tag = await dbService.createTag({
-      name,
-      description,
-      color: color || '#3b82f6',
-    });
+    const tag = await dbService.createTag(name, description, color || '#3b82f6');
 
     spinner.succeed(chalk.green(`Created tag: ${tag.name}`));
 

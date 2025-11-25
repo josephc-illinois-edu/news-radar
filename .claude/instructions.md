@@ -101,6 +101,27 @@ When starting work on roadmap items:
 3. Update CHANGELOG.md as features complete
 4. Mark items as completed: `- [x]` instead of `- [ ]`
 
+## Context Efficiency
+
+**Use agents for exploration:**
+- Codebase questions → Use Explore agent, not direct file reads
+- Multi-file searches → Use Explore agent with thoroughness level
+- Example: "Explore how variations are generated" not "Read write-command.ts"
+
+**Key files (read these directly when needed):**
+- `src/write-command.ts` - Main article generation CLI
+- `src/services/database.ts` - Supabase database operations
+- `src/utils/voice-analyzer.ts` - Voice profile analysis
+- `src/generators/article-generator.ts` - AI article generation
+
+**Background tasks:**
+- Use `run_in_background` for scans and long operations
+- Check status with BashOutput tool
+
+**Batch changes:**
+- Combine related fixes into single prompts
+- "Fix X, handle any TypeScript errors, and test" > multiple prompts
+
 ---
 
 **Note:** These instructions help Claude Code provide better, more consistent assistance aligned with your development workflow and Git practices.

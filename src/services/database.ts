@@ -112,7 +112,7 @@ export interface CreateArticleInput {
   tone_criticism?: number;
   keywords?: string[];
   hashtags?: string[];
-  status?: 'draft' | 'published';
+  status?: 'draft' | 'published' | 'archived';
 }
 
 export interface CreateSourceInput {
@@ -562,37 +562,6 @@ export class DatabaseService {
   // ==================== TAGS ====================
 
   /**
-   * Create a new tag
-   */
-  async createTag(input: {
-    name: string;
-    description?: string;
-    color?: string;
-  }): Promise<DBTag> {
-    const slug = input.name.toLowerCase().replace(/[^\w\s-]/g, '').replace(/\s+/g, '-');
-
-    const { data, error } = await this.supabase
-      .from('tags')
-      .insert({
-        name: input.name,
-        slug,
-        description: input.description,
-        color: input.color || '#3b82f6', // Default blue
-      })
-      .select()
-      .single();
-
-    if (error) {
-      if (error.code === '23505') {
-        throw new Error(`Tag "${input.name}" already exists`);
-      }
-      throw new Error(`Failed to create tag: ${error.message}`);
-    }
-
-    return data;
-  }
-
-  /**
    * Get tag by ID or slug
    */
   async getTag(idOrSlug: string): Promise<DBTag | null> {
@@ -672,26 +641,6 @@ export class DatabaseService {
   }
 
   /**
-   * Add tag to article
-   */
-  async addTagToArticle(articleId: string, tagId: string): Promise<void> {
-    const { error } = await this.supabase
-      .from('article_tags')
-      .insert({
-        article_id: articleId,
-        tag_id: tagId,
-      });
-
-    if (error) {
-      if (error.code === '23505') {
-        // Already exists, ignore
-        return;
-      }
-      throw new Error(`Failed to add tag to article: ${error.message}`);
-    }
-  }
-
-  /**
    * Remove tag from article
    */
   async removeTagFromArticle(articleId: string, tagId: string): Promise<void> {
@@ -702,20 +651,6 @@ export class DatabaseService {
       .eq('tag_id', tagId);
 
     if (error) throw new Error(`Failed to remove tag from article: ${error.message}`);
-  }
-
-  /**
-   * Get all tags for an article
-   */
-  async getArticleTags(articleId: string): Promise<DBTag[]> {
-    const { data, error } = await this.supabase
-      .from('article_tags')
-      .select('tag_id, tags(*)')
-      .eq('article_id', articleId);
-
-    if (error) throw new Error(`Failed to get article tags: ${error.message}`);
-
-    return (data || []).map((row: any) => row.tags);
   }
 
   /**

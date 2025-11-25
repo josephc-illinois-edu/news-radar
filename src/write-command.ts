@@ -47,8 +47,8 @@ async function generateVariations(
   count: number,
   baseOptions: WriteOptions,
   mockStory: StoryResult,
-  combinedContent: FetchedContent | null,
-  voiceProfile: VoiceProfile | null,
+  combinedContent: FetchedContent | undefined,
+  _voiceProfile: VoiceProfile | null,
   voiceInstructions: string | null
 ): Promise<Array<{ article: any; angle: VariationAngle; metadata: any }>> {
   const spinner = ora(`Generating ${count} variations with different angles...`).start();
@@ -105,11 +105,15 @@ function displayVariationComparison(variations: Array<{ article: any; angle: Var
   console.log(chalk.bold.white('  VARIATION COMPARISON'));
   console.log(chalk.bold.cyan('═'.repeat(80)));
 
-  variations.forEach(({ article, angle, metadata }, index) => {
+  variations.forEach(({ article, angle }, index) => {
     console.log(chalk.bold.yellow(`\n[${index + 1}] ${angle.name.toUpperCase()}`));
     console.log(chalk.dim(angle.description));
     console.log(chalk.white(`\nTitle: ${article.title}`));
-    console.log(chalk.dim(`Words: ${article.stats.words} | Reading time: ${article.stats.readingTime}`));
+
+    // Calculate word count and reading time
+    const words = article.content.split(/\s+/).length;
+    const readingTime = Math.ceil(words / 200);
+    console.log(chalk.dim(`Words: ${words} | Reading time: ${readingTime} min`));
 
     // Show first 200 characters of content
     const preview = article.content.substring(0, 200).replace(/\n/g, ' ');
@@ -179,8 +183,8 @@ async function executeWrite(options: WriteOptions): Promise<void> {
         const voicePath = `voices/${options.voice}.json`;
         const voiceContent = await fs.readFile(voicePath, 'utf-8');
         voiceProfile = JSON.parse(voiceContent);
-        voiceInstructions = generateVoiceInstructions(voiceProfile);
-        spinner.succeed(chalk.green(`Loaded voice profile: ${voiceProfile.name}`));
+        voiceInstructions = generateVoiceInstructions(voiceProfile!);
+        spinner.succeed(chalk.green(`Loaded voice profile: ${voiceProfile!.name}`));
         console.log(chalk.dim(`Voice: ${voiceInstructions.slice(0, 150)}...`));
         spinner.start('Initializing AI generator...');
       } catch (error) {
@@ -459,7 +463,7 @@ async function executeWrite(options: WriteOptions): Promise<void> {
 
       // Process each selected variation
       for (const index of selectedIndices) {
-        const { article, angle, metadata } = variations[index];
+        const { article, angle } = variations[index];
 
         console.log(chalk.bold.cyan(`\n📄 Processing variation ${index + 1}: ${angle.name}`));
 
@@ -535,7 +539,6 @@ async function executeWrite(options: WriteOptions): Promise<void> {
     }
 
     // Save to database if enabled
-    let savedArticleId: string | undefined;
     if (options.save) {
       spinner.start('Saving article to database...');
       try {
@@ -555,7 +558,6 @@ async function executeWrite(options: WriteOptions): Promise<void> {
             },
           }
         );
-        savedArticleId = dbArticle.id;
         spinner.succeed(chalk.green(`✓ Saved to database (ID: ${dbArticle.id})`));
       } catch (error) {
         spinner.warn(chalk.yellow('Could not save to database'));
@@ -670,6 +672,7 @@ const writeCommand = new Command('write')
       urgency: parseInt(cmdOptions.urgency as string, 10),
       optimism: parseInt(cmdOptions.optimism as string, 10),
       criticism: parseInt(cmdOptions.criticism as string, 10),
+      variations: parseInt(cmdOptions.variations as string, 10),
     };
 
     await executeWrite(options);
