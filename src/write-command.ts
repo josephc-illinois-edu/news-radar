@@ -272,6 +272,53 @@ async function executeWrite(options: WriteOptions): Promise<void> {
       sources: fetchedContents, // Keep all sources for citations
     } : undefined;
 
+    // Validate content quality - fail if insufficient
+    if (combinedContent) {
+      const contentQuality = {
+        facts: combinedContent.facts.length,
+        quotes: combinedContent.quotes.length,
+        numbers: combinedContent.numbers.length,
+        wordCount: combinedContent.content.split(/\s+/).length,
+      };
+
+      const hasMinimumContent =
+        contentQuality.facts >= 3 ||
+        contentQuality.quotes >= 2 ||
+        contentQuality.wordCount >= 300;
+
+      if (!hasMinimumContent) {
+        spinner.fail(chalk.red('Insufficient content extracted from sources'));
+        console.log(chalk.yellow('\n⚠ Content Quality Check Failed:'));
+        console.log(chalk.gray(`  Facts extracted: ${contentQuality.facts} (need 3+)`));
+        console.log(chalk.gray(`  Quotes extracted: ${contentQuality.quotes} (need 2+)`));
+        console.log(chalk.gray(`  Words extracted: ${contentQuality.wordCount} (need 300+)`));
+        console.log(chalk.yellow('\nThis usually means the source is paywalled or blocking scrapers.'));
+        console.log(chalk.cyan('\n💡 Try these alternatives:'));
+        console.log(chalk.gray('  1. Use --preview flag first to check content extraction'));
+        console.log(chalk.gray('  2. Try different news sources (avoid paywalled sites)'));
+        console.log(chalk.gray('  3. Search for the topic and use multiple sources:\n'));
+        console.log(chalk.white('     npm run write -- --url "source1.com" --url "source2.com" --url "source3.com"\n'));
+        process.exit(1);
+      }
+
+      // Show content quality for user confidence
+      console.log(chalk.green(`\n✓ Content quality check passed:`));
+      console.log(chalk.gray(`  ${contentQuality.facts} facts, ${contentQuality.quotes} quotes, ${contentQuality.wordCount} words`));
+    } else if (options.url) {
+      // URL provided but no content fetched - hard fail
+      spinner.fail(chalk.red('Failed to fetch content from all sources'));
+      console.log(chalk.yellow('\n⚠ All source URLs failed to load.'));
+      console.log(chalk.gray('\nPossible causes:'));
+      console.log(chalk.gray('  • Sites are paywalled or require login'));
+      console.log(chalk.gray('  • Sites are blocking automated access'));
+      console.log(chalk.gray('  • URLs are incorrect or broken'));
+      console.log(chalk.cyan('\n💡 Suggestions:'));
+      console.log(chalk.gray('  1. Verify URLs work in your browser'));
+      console.log(chalk.gray('  2. Try news aggregator sites (often more accessible)'));
+      console.log(chalk.gray('  3. Use --preview to diagnose fetch issues\n'));
+      process.exit(1);
+    }
+
     // Create story from fetched content or user input
     const storyTitle = combinedContent?.title || options.story || 'Emerging Story';
     const keywords = combinedContent
