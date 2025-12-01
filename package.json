@@ -13,6 +13,7 @@
     "export": "tsx src/export-command.ts export",
     "tags": "tsx src/tags-command.ts",
     "voice": "tsx src/voice-command.ts",
+    "image": "tsx src/image-command.ts",
     "publish": "tsx src/publish-command.ts",
     "test": "jest",
     "type-check": "tsc --noEmit",
