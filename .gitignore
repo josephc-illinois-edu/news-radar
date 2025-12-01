@@ -38,6 +38,9 @@ drafts/*.md
 # Exports (generated files)
 exports/
 
+# Generated images
+images/
+
 # Voice profiles (personal)
 voices/
 
