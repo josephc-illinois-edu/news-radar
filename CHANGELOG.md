@@ -56,6 +56,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Engagement Tracking** - View counts and analytics events
 - **Database Migrations** - SQL migrations for schema versioning
 
+**Non-Interactive Mode**
+- `--select` flag for write command: `all`, `first`, `best`, or comma-separated indices
+- `--yes` / `-y` flag to auto-confirm prompts (skip interactive confirmation)
+- Enables scripting and automation of article generation
+- Example: `npm run write -- --url "url" --variations 3 --select first --yes`
+
+**AI Image Generation**
+- New `npm run image` command for social media graphics
+- OpenAI DALL-E 3 integration for AI-generated images
+- SVG placeholder generation (no API required)
+- Platform-optimized dimensions (Facebook, LinkedIn, Twitter, Instagram, Blog)
+- 5 visual styles: modern, minimal, bold, gradient, photo
+- Multi-platform generation: `npm run image multi -- --title "..." --platforms facebook,linkedin,twitter`
+- Images saved to `images/` directory
+
+**Enhanced Batch Processing**
+- Voice profile support: `--voice <name>` flag
+- Variation support: `--variations <N>` per article
+- Auto-confirm: `--yes` flag for unattended batch runs
+- Image generation: `--images` flag to generate graphics
+- Image style selection: `--image-style <style>`
+- Detailed progress output with variation counts and image paths
+
+**Export Formats**
+- Markdown export with frontmatter: `npm run export <id> --format md`
+- HTML, PDF, JSON exports (existing)
+- Frontmatter includes: title, date, status, platform, keywords, hashtags
+- Metadata footer with publication date and hashtags
+
 ### Changed
 - Write command now saves to database by default (use `--no-save` to skip)
 - Articles include database ID for future reference

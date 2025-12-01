@@ -38,6 +38,8 @@ interface WriteOptions {
   save?: boolean;
   voice?: string;
   variations?: number;
+  select?: number[] | 'all' | 'first' | 'best';  // Non-interactive selection
+  yes?: boolean;  // Auto-confirm prompts
 }
 
 /**
@@ -126,8 +128,42 @@ function displayVariationComparison(variations: Array<{ article: any; angle: Var
 
 /**
  * Let user select which variation(s) to save
+ * Supports non-interactive mode via selectOption
  */
-async function selectVariations(count: number): Promise<number[]> {
+async function selectVariations(
+  count: number,
+  selectOption?: number[] | 'all' | 'first' | 'best',
+  variations?: Array<{ article: any; angle: VariationAngle; metadata: any }>
+): Promise<number[]> {
+  // Non-interactive mode
+  if (selectOption) {
+    if (selectOption === 'all') {
+      return Array.from({ length: count }, (_, i) => i);
+    }
+    if (selectOption === 'first') {
+      return [0];
+    }
+    if (selectOption === 'best') {
+      // Select the variation with highest word count (proxy for quality)
+      if (variations && variations.length > 0) {
+        let bestIndex = 0;
+        let maxWords = 0;
+        variations.forEach((v, i) => {
+          const words = v.article.content?.split(/\s+/).length || 0;
+          if (words > maxWords) {
+            maxWords = words;
+            bestIndex = i;
+          }
+        });
+        return [bestIndex];
+      }
+      return [0];
+    }
+    // Array of specific indices (1-based from CLI, convert to 0-based)
+    return selectOption.map(n => n - 1).filter(n => n >= 0 && n < count);
+  }
+
+  // Interactive mode
   const choices = [];
   for (let i = 0; i < count; i++) {
     choices.push({ title: `Variation ${i + 1}`, value: i });
@@ -418,25 +454,29 @@ async function executeWrite(options: WriteOptions): Promise<void> {
 
       console.log(chalk.bold.cyan('═'.repeat(70)));
 
-      // Ask for confirmation
-      const readline = await import('readline');
-      const rl = readline.createInterface({
-        input: process.stdin,
-        output: process.stdout
-      });
+      // Ask for confirmation (skip if --yes flag is set)
+      if (!options.yes) {
+        const readline = await import('readline');
+        const rl = readline.createInterface({
+          input: process.stdin,
+          output: process.stdout
+        });
 
-      const answer = await new Promise<string>((resolve) => {
-        rl.question(chalk.cyan('\n💰 Generate article using API credits? (y/n): '), resolve);
-      });
-      rl.close();
+        const answer = await new Promise<string>((resolve) => {
+          rl.question(chalk.cyan('\n💰 Generate article using API credits? (y/n): '), resolve);
+        });
+        rl.close();
 
-      if (answer.toLowerCase() !== 'y' && answer.toLowerCase() !== 'yes') {
-        console.log(chalk.yellow('\n✖ Article generation cancelled. No credits used.\n'));
-        process.exit(0);
+        if (answer.toLowerCase() !== 'y' && answer.toLowerCase() !== 'yes') {
+          console.log(chalk.yellow('\n✖ Article generation cancelled. No credits used.\n'));
+          process.exit(0);
+        }
+      } else {
+        console.log(chalk.gray('\n✓ Auto-confirmed with --yes flag'));
       }
 
       console.log('');
-      spinner.start('User confirmed. Generating article...');
+      spinner.start('Generating article...');
     }
 
     // Check if generating multiple variations
@@ -455,11 +495,15 @@ async function executeWrite(options: WriteOptions): Promise<void> {
         voiceInstructions
       );
 
-      // Display comparison
-      displayVariationComparison(variations);
+      // Display comparison (skip in non-interactive mode with --select)
+      if (!options.select) {
+        displayVariationComparison(variations);
+      } else {
+        console.log(chalk.gray(`\n📋 Non-interactive mode: using --select ${typeof options.select === 'string' ? options.select : options.select.join(',')}\n`));
+      }
 
       // Let user select which to save
-      const selectedIndices = await selectVariations(variationCount);
+      const selectedIndices = await selectVariations(variationCount, options.select, variations);
 
       // Process each selected variation
       for (const index of selectedIndices) {
@@ -649,6 +693,8 @@ const writeCommand = new Command('write')
   .option('--style <style>', 'Writing style (conversational, academic)', 'conversational')
   .option('--voice <name>', 'Use trained voice profile (see: npm run voice list)')
   .option('--variations <number>', 'Generate N variations with different angles (2-5)', '1')
+  .option('--select <selection>', 'Non-interactive selection: "all", "first", "best", or comma-separated indices (e.g., "1,3")')
+  .option('-y, --yes', 'Auto-confirm prompts (skip interactive confirmations)')
   .option('--preview', 'Preview extracted content and confirm before using API credits')
   .option('--save', 'Save article to Supabase database (enabled by default)', true)
   .option('--no-save', 'Skip saving to database')
@@ -658,6 +704,18 @@ const writeCommand = new Command('write')
   .option('--optimism <number>', 'Optimism level (0-10)', '6')
   .option('--criticism <number>', 'Criticism level (0-10)', '5')
   .action(async (cmdOptions) => {
+    // Parse --select option
+    let selectOption: number[] | 'all' | 'first' | 'best' | undefined;
+    if (cmdOptions.select) {
+      const sel = cmdOptions.select as string;
+      if (sel === 'all' || sel === 'first' || sel === 'best') {
+        selectOption = sel;
+      } else {
+        // Parse comma-separated indices
+        selectOption = sel.split(',').map((s: string) => parseInt(s.trim(), 10)).filter((n: number) => !isNaN(n));
+      }
+    }
+
     const options: WriteOptions = {
       story: cmdOptions.story as string | undefined,
       url: cmdOptions.url as string | string[] | undefined,
@@ -666,6 +724,7 @@ const writeCommand = new Command('write')
       style: (cmdOptions.style as WriteOptions['style']) || 'conversational',
       voice: cmdOptions.voice as string | undefined,
       preview: cmdOptions.preview as boolean || false,
+      yes: cmdOptions.yes as boolean || false,
       save: cmdOptions.save !== false, // Enabled by default unless --no-save is used
       output: cmdOptions.output as string | undefined,
       humor: parseInt(cmdOptions.humor as string, 10),
@@ -673,6 +732,7 @@ const writeCommand = new Command('write')
       optimism: parseInt(cmdOptions.optimism as string, 10),
       criticism: parseInt(cmdOptions.criticism as string, 10),
       variations: parseInt(cmdOptions.variations as string, 10),
+      select: selectOption,
     };
 
     await executeWrite(options);
