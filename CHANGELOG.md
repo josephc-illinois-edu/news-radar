@@ -146,47 +146,73 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Upcoming Features
 
-### Planned for 0.2.0 - Database & Storage Layer
-- [ ] **Supabase Integration**
-  - [ ] Articles database (content, metadata, status)
-  - [ ] User authentication and profiles
-  - [ ] Analytics tracking (views, engagement)
-  - [ ] Source tracking and history
-- [ ] **Article Management**
-  - [ ] Save generated articles to database
-  - [ ] Article revision history and version control
-  - [ ] Draft/published status workflow
-  - [ ] Tag and category system
-- [ ] **Content Generation Enhancements**
-  - [ ] Batch article generation (queue multiple stories)
-  - [ ] Export to multiple formats (HTML, PDF, JSON)
-  - [ ] Custom voice training from sample articles
-- [ ] **AI Image Generation**
-  - [ ] OpenAI DALL-E or Stable Diffusion integration
-  - [ ] Auto-generate social media graphics from articles
-  - [ ] Template-based image generation (quotes, stats)
+### Planned for 0.3.0 - News Radar Studio (Web Application)
 
-### Planned for 0.3.0 - Next.js Web Dashboard
-- [ ] **CMS Interface**
-  - [ ] Next.js 14+ with App Router
-  - [ ] Visual article editor (WYSIWYG or Markdown)
-  - [ ] Drag-and-drop article organization
-  - [ ] Content calendar view
-- [ ] **Graphics Studio**
-  - [ ] Built-in graphics generator interface
-  - [ ] Social media image templates
-  - [ ] Preview and customize AI-generated images
-  - [ ] Export optimized for each platform
-- [ ] **Publishing Platform Integrations**
-  - [ ] LinkedIn API integration
+Full-featured web application with CLI parity, built on Next.js 14+ with shared API layer.
+
+- [ ] **Phase 1: API Layer & Auth**
+  - [ ] REST API endpoints for all services
+  - [ ] Supabase Auth integration
+  - [ ] API key support for CLI
+  - [ ] Shared service layer (CLI + Web)
+
+- [ ] **Phase 2: Articles Module**
+  - [ ] Article list with filtering, search, sorting
+  - [ ] Article detail view with metadata
+  - [ ] Markdown editor with live preview
+  - [ ] Revision history browser
+  - [ ] Tag management interface
+  - [ ] Bulk actions (archive, delete, publish)
+
+- [ ] **Phase 3: Research Module**
+  - [ ] Source scanner UI (mirrors `npm run scan`)
+  - [ ] Topic discovery and trending analysis
+  - [ ] Save and manage research sessions
+  - [ ] Source effectiveness tracking
+
+- [ ] **Phase 4: Create Module**
+  - [ ] Article generation UI (mirrors `npm run write`)
+  - [ ] Voice profile selector
+  - [ ] Tone controls (humor, urgency, optimism, criticism)
+  - [ ] Platform and length options
+  - [ ] Variation generation with comparison view
+  - [ ] Preview mode with cost estimation
+
+- [ ] **Phase 5: Graphics Module**
+  - [ ] AI image generation interface
+  - [ ] Platform-specific templates
+  - [ ] Style selector (modern, minimal, bold, gradient, photo)
+  - [ ] Multi-platform batch generation
+  - [ ] Image library management
+
+- [ ] **Phase 6: Publish Module**
+  - [ ] Publishing calendar view
+  - [ ] Post scheduling queue
+  - [ ] Multi-platform publishing (Facebook, LinkedIn, Twitter/X)
   - [ ] Medium API integration
   - [ ] WordPress REST API integration
-  - [ ] Facebook/Instagram scheduling
-- [ ] **Analytics Dashboard**
-  - [ ] Article performance tracking
-  - [ ] Source effectiveness metrics
+  - [ ] Instagram scheduling
+
+- [ ] **Phase 7: Engage Module**
+  - [ ] Unified social inbox
+  - [ ] View comments/reactions across platforms
+  - [ ] Reply to comments from dashboard
+  - [ ] Sentiment tracking
+  - [ ] Platform webhooks for real-time updates
+
+- [ ] **Phase 8: Analytics Module**
+  - [ ] Article performance metrics
   - [ ] Engagement trends visualization
-  - [ ] Cost tracking (API usage)
+  - [ ] Source effectiveness reports
+  - [ ] API cost tracking
+  - [ ] Export reports
+
+**Tech Stack:**
+- Next.js 14+ (App Router)
+- Tailwind CSS + shadcn/ui
+- TanStack Query (React Query)
+- Supabase (Auth + Database)
+- Vercel (Hosting)
 
 ### Planned for 0.4.0 - Advanced Features
 - [ ] **Real-time Monitoring**
