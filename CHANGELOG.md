@@ -5,6 +5,106 @@ All notable changes to News Radar will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] - 2025-12-03
+
+### Added
+
+**News Radar Studio - Full Web Application**
+
+Complete web application with CLI parity built on Next.js 16, providing a visual interface for all content creation and publishing features.
+
+**Phase 1-2: Foundation & Articles**
+- Next.js 16 app with App Router, TypeScript, Tailwind CSS
+- shadcn/ui component library (button, card, tabs, select, input, etc.)
+- Supabase SSR integration (browser client, server client, middleware)
+- Protected routes with authentication middleware
+- Login/signup pages with OAuth support
+- Dashboard layout with sidebar navigation
+- Articles list with search, filtering, status badges
+- Article detail view with tabs (content, sources, revisions, metadata)
+- Article editor with write/preview modes
+
+**Phase 3: Research Module**
+- Source scanner UI mirroring `npm run scan`
+- HackerNews, Lobsters, Guardian integrations
+- Story cards with engagement velocity indicators
+- Source selection for article creation flow
+
+**Phase 4: Create Module**
+- Article generation UI with URL input
+- Platform selector (Facebook, LinkedIn, Newsletter, Blog)
+- Length options (Tweet, Short, Medium, Long)
+- Style picker (Conversational, Academic)
+- Tone sliders (Humor, Urgency, Optimism, Criticism)
+- Variation count selector (1-5)
+- Generated content preview with tabs
+- AI generation via Anthropic API with mock fallback
+
+**Phase 5: Graphics Module**
+- Image generation UI for social media graphics
+- Platform selector with dimensions (Facebook, LinkedIn, Twitter, Instagram, Blog)
+- Style selector (Modern, Minimal, Bold, Gradient, Photo)
+- AI mode using Pollinations.ai (free, no API key required)
+- SVG placeholder generation mode
+- Image preview and download functionality
+
+**Phase 6: Publish Module**
+- Multi-platform publishing interface
+- Platform connections management (Facebook, LinkedIn, Twitter, Medium, WordPress, Ghost)
+- Scheduled publishing with date/time picker
+- Custom content per platform
+- Publishing results with status and links
+
+**Phase 7: Engage Module**
+- Social engagement dashboard
+- Engagement list with filters (platform, status, type, sentiment)
+- Stats cards (total, pending, replied, flagged)
+- AI-suggested replies using Anthropic API
+- Reply composition with tone options
+- Bulk actions (ignore, flag)
+- Sentiment analysis badges
+
+**Phase 8: Analytics Module**
+- Analytics dashboard with time range selector
+- Overview stats (views, engagements, avg read time, top platform)
+- Platform performance comparison with engagement rates
+- Top performing articles ranking
+- Content analytics (by length, style, tone, publish time)
+- Visual trend charts for views and engagements
+
+**API Layer**
+- REST API endpoints for articles, tags, sources, revisions
+- Research scan API with multi-source support
+- Article generation API with Anthropic integration
+- Graphics generation API
+- Publishing API with platform integrations
+- Engagement API with AI suggestions
+- Analytics API with metrics aggregation
+
+**Tech Stack:**
+- Next.js 16 (App Router, Turbopack)
+- Tailwind CSS + shadcn/ui components
+- TanStack Query hooks for data fetching
+- Supabase (Auth + PostgreSQL)
+- TypeScript with strict mode
+- React 19
+
+### Routes Created
+- `/` - Landing page
+- `/login`, `/signup` - Authentication
+- `/dashboard` - Main dashboard
+- `/dashboard/articles` - Article management
+- `/dashboard/articles/[id]` - Article detail
+- `/dashboard/articles/[id]/edit` - Article editor
+- `/dashboard/research` - Source scanning
+- `/dashboard/create` - Article generation
+- `/dashboard/graphics` - Image generation
+- `/dashboard/publish` - Multi-platform publishing
+- `/dashboard/engage` - Social engagement
+- `/dashboard/analytics` - Performance analytics
+
+---
+
 ## [0.2.0] - 2025-11-25
 
 ### Added
@@ -145,74 +245,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ---
 
 ## Upcoming Features
-
-### Planned for 0.3.0 - News Radar Studio (Web Application)
-
-Full-featured web application with CLI parity, built on Next.js 14+ with shared API layer.
-
-- [ ] **Phase 1: API Layer & Auth**
-  - [ ] REST API endpoints for all services
-  - [ ] Supabase Auth integration
-  - [ ] API key support for CLI
-  - [ ] Shared service layer (CLI + Web)
-
-- [ ] **Phase 2: Articles Module**
-  - [ ] Article list with filtering, search, sorting
-  - [ ] Article detail view with metadata
-  - [ ] Markdown editor with live preview
-  - [ ] Revision history browser
-  - [ ] Tag management interface
-  - [ ] Bulk actions (archive, delete, publish)
-
-- [ ] **Phase 3: Research Module**
-  - [ ] Source scanner UI (mirrors `npm run scan`)
-  - [ ] Topic discovery and trending analysis
-  - [ ] Save and manage research sessions
-  - [ ] Source effectiveness tracking
-
-- [ ] **Phase 4: Create Module**
-  - [ ] Article generation UI (mirrors `npm run write`)
-  - [ ] Voice profile selector
-  - [ ] Tone controls (humor, urgency, optimism, criticism)
-  - [ ] Platform and length options
-  - [ ] Variation generation with comparison view
-  - [ ] Preview mode with cost estimation
-
-- [ ] **Phase 5: Graphics Module**
-  - [ ] AI image generation interface
-  - [ ] Platform-specific templates
-  - [ ] Style selector (modern, minimal, bold, gradient, photo)
-  - [ ] Multi-platform batch generation
-  - [ ] Image library management
-
-- [ ] **Phase 6: Publish Module**
-  - [ ] Publishing calendar view
-  - [ ] Post scheduling queue
-  - [ ] Multi-platform publishing (Facebook, LinkedIn, Twitter/X)
-  - [ ] Medium API integration
-  - [ ] WordPress REST API integration
-  - [ ] Instagram scheduling
-
-- [ ] **Phase 7: Engage Module**
-  - [ ] Unified social inbox
-  - [ ] View comments/reactions across platforms
-  - [ ] Reply to comments from dashboard
-  - [ ] Sentiment tracking
-  - [ ] Platform webhooks for real-time updates
-
-- [ ] **Phase 8: Analytics Module**
-  - [ ] Article performance metrics
-  - [ ] Engagement trends visualization
-  - [ ] Source effectiveness reports
-  - [ ] API cost tracking
-  - [ ] Export reports
-
-**Tech Stack:**
-- Next.js 14+ (App Router)
-- Tailwind CSS + shadcn/ui
-- TanStack Query (React Query)
-- Supabase (Auth + Database)
-- Vercel (Hosting)
 
 ### Planned for 0.4.0 - Advanced Features
 - [ ] **Real-time Monitoring**
