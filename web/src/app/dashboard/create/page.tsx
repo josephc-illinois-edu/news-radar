@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -34,6 +34,33 @@ const DEFAULT_TONE: ToneSettings = {
 };
 
 export default function CreatePage() {
+  return (
+    <Suspense fallback={<CreatePageSkeleton />}>
+      <CreatePageContent />
+    </Suspense>
+  );
+}
+
+function CreatePageSkeleton() {
+  return (
+    <div className="space-y-6">
+      <div>
+        <div className="h-9 bg-muted rounded w-48 animate-pulse" />
+        <div className="h-5 bg-muted rounded w-72 mt-2 animate-pulse" />
+      </div>
+      <div className="grid gap-6 lg:grid-cols-3">
+        <div className="lg:col-span-1 space-y-4">
+          <Card><CardContent className="py-12" /></Card>
+        </div>
+        <div className="lg:col-span-2">
+          <Card><CardContent className="py-12" /></Card>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function CreatePageContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
 
