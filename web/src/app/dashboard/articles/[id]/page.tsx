@@ -1,6 +1,6 @@
 'use client';
 
-import { use } from 'react';
+import { use, useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useArticle, useArticleSources, useArticleRevisions, useDeleteArticle, usePublishArticle } from '@/hooks/use-articles';
@@ -10,6 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
+import { PLATFORM_CONFIGS, IMAGE_STYLES, type GeneratedImage } from '@/types/graphics';
 
 export default function ArticleDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -102,6 +103,26 @@ export default function ArticleDetailPage({ params }: { params: Promise<{ id: st
         </TabsList>
 
         <TabsContent value="content" className="space-y-4">
+          {/* Featured Image Preview */}
+          {article.featured_image_platform && article.featured_image_style && (
+            <FeaturedImagePreview
+              title={article.title}
+              platform={article.featured_image_platform}
+              style={article.featured_image_style}
+            />
+          )}
+
+          {!article.featured_image_platform && (
+            <Card className="border-dashed">
+              <CardContent className="py-4 text-center text-muted-foreground text-sm">
+                No featured image.{' '}
+                <Link href={`/dashboard/articles/${id}/edit`} className="underline hover:text-foreground">
+                  Add one
+                </Link>
+              </CardContent>
+            </Card>
+          )}
+
           <Card>
             <CardContent className="pt-6">
               <article className="prose prose-neutral dark:prose-invert max-w-none">
@@ -285,6 +306,30 @@ export default function ArticleDetailPage({ params }: { params: Promise<{ id: st
                   </div>
                 </dl>
               </div>
+
+              <Separator className="my-4" />
+
+              <div className="space-y-2">
+                <p className="text-sm text-muted-foreground">Featured Image Settings</p>
+                <dl className="grid grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <dt className="text-muted-foreground">Platform</dt>
+                    <dd className="capitalize">
+                      {article.featured_image_platform
+                        ? PLATFORM_CONFIGS[article.featured_image_platform]?.name
+                        : 'Not set'}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-muted-foreground">Style</dt>
+                    <dd className="capitalize">
+                      {article.featured_image_style
+                        ? IMAGE_STYLES[article.featured_image_style]?.name
+                        : 'Not set'}
+                    </dd>
+                  </div>
+                </dl>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
@@ -317,5 +362,142 @@ function ArticleSkeleton() {
       </div>
       <Skeleton className="h-[400px] w-full" />
     </div>
+  );
+}
+
+function FeaturedImagePreview({
+  title,
+  platform,
+  style,
+}: {
+  title: string;
+  platform: string;
+  style: string;
+}) {
+  const [image, setImage] = useState<GeneratedImage | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    async function generateImage() {
+      setIsLoading(true);
+      setError(null);
+
+      try {
+        const response = await fetch('/api/graphics/generate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            title,
+            platform,
+            style,
+            mode: 'placeholder',
+          }),
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to generate image');
+        }
+
+        const data: GeneratedImage = await response.json();
+        setImage(data);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to load image');
+      } finally {
+        setIsLoading(false);
+      }
+    }
+
+    generateImage();
+  }, [title, platform, style]);
+
+  const platformConfig = PLATFORM_CONFIGS[platform as keyof typeof PLATFORM_CONFIGS];
+  const styleConfig = IMAGE_STYLES[style as keyof typeof IMAGE_STYLES];
+
+  const handleDownload = async () => {
+    if (!image) return;
+
+    try {
+      if (image.url.startsWith('data:')) {
+        const link = document.createElement('a');
+        link.href = image.url;
+        link.download = `${title.replace(/[^a-z0-9]/gi, '-').toLowerCase()}-${platform}.svg`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      } else {
+        const response = await fetch(image.url);
+        const blob = await response.blob();
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `${title.replace(/[^a-z0-9]/gi, '-').toLowerCase()}-${platform}.png`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+      }
+    } catch {
+      // Silent fail on download
+    }
+  };
+
+  if (error) {
+    return (
+      <Card className="border-destructive">
+        <CardContent className="py-4 text-center text-destructive text-sm">
+          {error}
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Card>
+      <CardHeader className="pb-2">
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-sm">Featured Image</CardTitle>
+          <div className="flex gap-1">
+            <Badge variant="secondary" className="text-xs">
+              {platformConfig?.name || platform}
+            </Badge>
+            <Badge variant="secondary" className="text-xs">
+              {styleConfig?.name || style}
+            </Badge>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent>
+        {isLoading ? (
+          <div className="animate-pulse">
+            <div
+              className="bg-muted rounded w-full"
+              style={{
+                aspectRatio: platformConfig
+                  ? `${platformConfig.width}/${platformConfig.height}`
+                  : '16/9',
+              }}
+            />
+          </div>
+        ) : image ? (
+          <div className="space-y-2">
+            <div className="border rounded-lg overflow-hidden bg-muted">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={image.url}
+                alt={title}
+                className="w-full h-auto"
+                style={{ aspectRatio: `${image.width}/${image.height}` }}
+              />
+            </div>
+            <div className="flex justify-end">
+              <Button variant="ghost" size="sm" onClick={handleDownload}>
+                Download
+              </Button>
+            </div>
+          </div>
+        ) : null}
+      </CardContent>
+    </Card>
   );
 }

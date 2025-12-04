@@ -10,12 +10,22 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { FeaturedImageGenerator } from '@/components/articles/featured-image-generator';
+import type { ImagePlatform, ImageStyle } from '@/types/graphics';
 
 export default function ArticleEditPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -29,7 +39,11 @@ export default function ArticleEditPage({ params }: { params: Promise<{ id: stri
   const [platform, setPlatform] = useState('');
   const [status, setStatus] = useState('');
   const [hashtags, setHashtags] = useState('');
+  const [imagePlatform, setImagePlatform] = useState<ImagePlatform>('facebook');
+  const [imageStyle, setImageStyle] = useState<ImageStyle>('modern');
   const [isDirty, setIsDirty] = useState(false);
+  const [showImageDialog, setShowImageDialog] = useState(false);
+  const [pendingSave, setPendingSave] = useState(false);
 
   // Initialize form when article loads
   useEffect(() => {
@@ -39,6 +53,8 @@ export default function ArticleEditPage({ params }: { params: Promise<{ id: stri
       setPlatform(article.platform || '');
       setStatus(article.status);
       setHashtags(article.hashtags?.join(', ') || '');
+      setImagePlatform(article.featured_image_platform || 'facebook');
+      setImageStyle(article.featured_image_style || 'modern');
     }
   }, [article]);
 
@@ -50,12 +66,23 @@ export default function ArticleEditPage({ params }: { params: Promise<{ id: stri
         content !== article.content ||
         platform !== (article.platform || '') ||
         status !== article.status ||
-        hashtags !== (article.hashtags?.join(', ') || '');
+        hashtags !== (article.hashtags?.join(', ') || '') ||
+        imagePlatform !== (article.featured_image_platform || 'facebook') ||
+        imageStyle !== (article.featured_image_style || 'modern');
       setIsDirty(hasChanges);
     }
-  }, [title, content, platform, status, hashtags, article]);
+  }, [title, content, platform, status, hashtags, imagePlatform, imageStyle, article]);
 
-  const handleSave = async () => {
+  const handleSaveClick = () => {
+    // Check if article has no image settings - prompt user
+    if (!article?.featured_image_platform && !pendingSave) {
+      setShowImageDialog(true);
+      return;
+    }
+    performSave();
+  };
+
+  const performSave = async () => {
     const hashtagsArray = hashtags
       .split(',')
       .map((t) => t.trim())
@@ -68,12 +95,26 @@ export default function ArticleEditPage({ params }: { params: Promise<{ id: stri
       platform: platform as any || undefined,
       status: status as any,
       hashtags: hashtagsArray.length > 0 ? hashtagsArray : undefined,
+      featured_image_platform: imagePlatform,
+      featured_image_style: imageStyle,
       word_count: content.split(/\s+/).filter(Boolean).length,
       reading_time_minutes: Math.ceil(content.split(/\s+/).filter(Boolean).length / 200),
     });
 
     setIsDirty(false);
+    setPendingSave(false);
     router.push(`/dashboard/articles/${id}`);
+  };
+
+  const handleSkipImage = () => {
+    setShowImageDialog(false);
+    setPendingSave(true);
+    performSave();
+  };
+
+  const handleImageSettingsChange = (newPlatform: ImagePlatform, newStyle: ImageStyle) => {
+    setImagePlatform(newPlatform);
+    setImageStyle(newStyle);
   };
 
   if (isLoading) {
@@ -124,7 +165,7 @@ export default function ArticleEditPage({ params }: { params: Promise<{ id: stri
             <Link href={`/dashboard/articles/${id}`}>Cancel</Link>
           </Button>
           <Button
-            onClick={handleSave}
+            onClick={handleSaveClick}
             disabled={!isDirty || updateArticle.isPending}
           >
             {updateArticle.isPending ? 'Saving...' : 'Save Changes'}
@@ -245,6 +286,22 @@ export default function ArticleEditPage({ params }: { params: Promise<{ id: stri
 
           <Card>
             <CardHeader>
+              <CardTitle className="text-base">Featured Image</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <FeaturedImageGenerator
+                title={title}
+                content={content}
+                platform={imagePlatform}
+                style={imageStyle}
+                onSettingsChange={handleImageSettingsChange}
+                compact
+              />
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
               <CardTitle className="text-base">Article Info</CardTitle>
             </CardHeader>
             <CardContent className="text-sm space-y-2">
@@ -264,6 +321,35 @@ export default function ArticleEditPage({ params }: { params: Promise<{ id: stri
           </Card>
         </div>
       </div>
+
+      {/* Auto-suggest image dialog */}
+      <Dialog open={showImageDialog} onOpenChange={setShowImageDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Generate a Featured Image?</DialogTitle>
+            <DialogDescription>
+              Your article doesn&apos;t have a featured image yet. Would you like to generate one before saving?
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <FeaturedImageGenerator
+              title={title}
+              content={content}
+              platform={imagePlatform}
+              style={imageStyle}
+              onSettingsChange={handleImageSettingsChange}
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={handleSkipImage}>
+              Skip for now
+            </Button>
+            <Button onClick={() => { setShowImageDialog(false); performSave(); }}>
+              Save with image settings
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

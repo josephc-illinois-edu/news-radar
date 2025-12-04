@@ -13,10 +13,28 @@ type RouteContext = { params: Promise<{ id: string }> };
 // Demo article for when Supabase is not configured
 const getDemoArticle = (id: string): DBArticle => ({
   id,
-  title: 'Demo Article',
-  content: 'This is demo content for the article.',
+  title: 'Demo Article: The Future of AI in Content Creation',
+  content: `Artificial intelligence is transforming how we create and consume content. From automated writing assistants to image generation tools, AI is becoming an integral part of the creative process.
+
+Key developments include:
+- Large language models that can draft articles, stories, and marketing copy
+- Image generation systems that create visuals from text descriptions
+- Video synthesis tools that animate still images
+
+The implications for content creators are significant. While some fear job displacement, others see AI as a powerful collaborator that enhances human creativity.
+
+"AI won't replace writers, but writers who use AI will replace those who don't," says industry analyst Jane Smith.
+
+What do you think about the future of AI in creative work? Share your thoughts in the comments.`,
+  excerpt: 'Exploring how artificial intelligence is reshaping content creation',
   status: 'draft',
-  view_count: 0,
+  platform: 'linkedin',
+  word_count: 120,
+  reading_time_minutes: 1,
+  hashtags: ['#AI', '#ContentCreation', '#FutureOfWork'],
+  featured_image_platform: 'linkedin',
+  featured_image_style: 'modern',
+  view_count: 42,
   created_at: new Date().toISOString(),
   updated_at: new Date().toISOString(),
 });

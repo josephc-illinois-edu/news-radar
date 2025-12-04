@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -22,6 +22,7 @@ import {
   type GenerateMode,
   type GeneratedImage,
 } from '@/types/graphics';
+import { DalleCostStatus } from '@/components/graphics/dalle-cost-status';
 
 export default function GraphicsPage() {
   // Form state
@@ -35,6 +36,46 @@ export default function GraphicsPage() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [result, setResult] = useState<GeneratedImage | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [savedUrl, setSavedUrl] = useState<string | null>(null);
+  const costStatusRef = useRef<{ refresh: () => void } | null>(null);
+
+  const handleSaveToLibrary = async () => {
+    if (!result) return;
+
+    setIsSaving(true);
+    setError(null);
+
+    try {
+      const response = await fetch('/api/images', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          imageUrl: result.url,
+          title,
+          platform: result.platform,
+          style: result.style,
+          generationMode: mode,
+          prompt: result.prompt,
+          width: result.width,
+          height: result.height,
+          cost: result.cost || 0,
+        }),
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || 'Failed to save');
+      }
+
+      const saved = await response.json();
+      setSavedUrl(saved.public_url || result.url);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to save image');
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   const handleGenerate = async () => {
     if (!title.trim()) {
@@ -45,6 +86,7 @@ export default function GraphicsPage() {
     setIsGenerating(true);
     setError(null);
     setResult(null);
+    setSavedUrl(null);
 
     try {
       const response = await fetch('/api/graphics/generate', {
@@ -126,6 +168,15 @@ export default function GraphicsPage() {
               <CardTitle className="text-base">Content</CardTitle>
               <CardDescription>Text to display on the image</CardDescription>
             </CardHeader>
+            {title.trim() && (
+              <div className="px-6 pb-2">
+                <div className="p-2 bg-muted rounded-md">
+                  <p className="text-xs text-muted-foreground mb-1">Preview:</p>
+                  <p className="text-sm font-medium">{title}</p>
+                  {subtitle && <p className="text-xs text-muted-foreground mt-0.5">{subtitle}</p>}
+                </div>
+              </div>
+            )}
             <CardContent className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="title">Title *</Label>
@@ -224,6 +275,9 @@ export default function GraphicsPage() {
             </CardContent>
           </Card>
 
+          {/* Cost Status */}
+          <DalleCostStatus compact className="px-1" />
+
           <Button
             onClick={handleGenerate}
             disabled={isGenerating || !title.trim()}
@@ -272,6 +326,11 @@ export default function GraphicsPage() {
                   <div className="flex gap-2">
                     <Badge variant="outline">{PLATFORM_CONFIGS[result.platform].name}</Badge>
                     <Badge variant="outline">{IMAGE_STYLES[result.style].name}</Badge>
+                    {result.cost && (
+                      <Badge variant="secondary" className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100">
+                        ${result.cost.toFixed(2)}
+                      </Badge>
+                    )}
                   </div>
                 </div>
               </CardHeader>
@@ -298,7 +357,7 @@ export default function GraphicsPage() {
                   )}
                 </div>
 
-                <div className="flex gap-2">
+                <div className="flex gap-2 flex-wrap">
                   <Button onClick={handleDownload}>
                     Download Image
                   </Button>
@@ -308,7 +367,19 @@ export default function GraphicsPage() {
                   <Button variant="outline" onClick={handleGenerate}>
                     Regenerate
                   </Button>
+                  <Button
+                    variant={savedUrl ? "secondary" : "default"}
+                    onClick={handleSaveToLibrary}
+                    disabled={isSaving || !!savedUrl}
+                  >
+                    {isSaving ? 'Saving...' : savedUrl ? 'Saved to Library' : 'Save to Library'}
+                  </Button>
                 </div>
+                {savedUrl && (
+                  <p className="text-xs text-green-600 dark:text-green-400">
+                    ✓ Image saved to library for future use
+                  </p>
+                )}
               </CardContent>
             </Card>
           )}

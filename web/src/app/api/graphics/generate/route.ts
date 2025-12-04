@@ -3,8 +3,80 @@
  * POST /api/graphics/generate - Generate social media images
  */
 import { NextRequest, NextResponse } from 'next/server';
+import { promises as fs } from 'fs';
+import * as path from 'path';
 import type { ImageGenerationOptions, GeneratedImage } from '@/types/graphics';
-import { PLATFORM_CONFIGS, IMAGE_STYLES } from '@/types/graphics';
+import { PLATFORM_CONFIGS, IMAGE_STYLES, IMAGE_QUALITIES } from '@/types/graphics';
+
+// DALL-E cost tracking
+interface CostTracker {
+  daily: { date: string; cost: number; count: number };
+  monthly: { month: string; cost: number; count: number };
+  total: { cost: number; count: number };
+}
+
+const DALLE_COSTS: Record<string, number> = {
+  '1024x1024': 0.04,
+  '1792x1024': 0.08,
+  '1024x1792': 0.08,
+};
+
+function getCostLimits() {
+  return {
+    dailyLimit: parseFloat(process.env.DALLE_DAILY_LIMIT || '5'),
+    monthlyLimit: parseFloat(process.env.DALLE_MONTHLY_LIMIT || '50'),
+  };
+}
+
+async function loadCostTracker(): Promise<CostTracker> {
+  const trackerPath = path.join(process.cwd(), '..', 'data', 'dalle-costs.json');
+  const today = new Date().toISOString().slice(0, 10);
+  const month = new Date().toISOString().slice(0, 7);
+
+  try {
+    const data = await fs.readFile(trackerPath, 'utf-8');
+    const tracker = JSON.parse(data) as CostTracker;
+    if (tracker.daily.date !== today) tracker.daily = { date: today, cost: 0, count: 0 };
+    if (tracker.monthly.month !== month) tracker.monthly = { month, cost: 0, count: 0 };
+    return tracker;
+  } catch {
+    return {
+      daily: { date: today, cost: 0, count: 0 },
+      monthly: { month, cost: 0, count: 0 },
+      total: { cost: 0, count: 0 },
+    };
+  }
+}
+
+async function saveCostTracker(tracker: CostTracker): Promise<void> {
+  const trackerPath = path.join(process.cwd(), '..', 'data', 'dalle-costs.json');
+  await fs.mkdir(path.dirname(trackerPath), { recursive: true });
+  await fs.writeFile(trackerPath, JSON.stringify(tracker, null, 2));
+}
+
+async function checkAndRecordCost(size: string): Promise<{ allowed: boolean; cost: number; reason?: string }> {
+  const limits = getCostLimits();
+  const tracker = await loadCostTracker();
+  const cost = DALLE_COSTS[size] || 0.08;
+
+  if (tracker.daily.cost >= limits.dailyLimit) {
+    return { allowed: false, cost, reason: `Daily limit reached (${limits.dailyLimit.toFixed(2)})` };
+  }
+  if (tracker.monthly.cost >= limits.monthlyLimit) {
+    return { allowed: false, cost, reason: `Monthly limit reached (${limits.monthlyLimit.toFixed(2)})` };
+  }
+
+  // Record the cost
+  tracker.daily.cost += cost;
+  tracker.daily.count += 1;
+  tracker.monthly.cost += cost;
+  tracker.monthly.count += 1;
+  tracker.total.cost += cost;
+  tracker.total.count += 1;
+  await saveCostTracker(tracker);
+
+  return { allowed: true, cost };
+}
 
 // Style-specific prompt modifiers
 const STYLE_PROMPTS: Record<string, string> = {
@@ -112,16 +184,98 @@ export async function POST(request: NextRequest) {
 
     let result: GeneratedImage;
 
-    if (body.mode === 'ai') {
+    if (body.mode === 'dalle') {
+      // DALL-E 3 generation
+      const openaiApiKey = process.env.OPENAI_API_KEY;
+      if (!openaiApiKey) {
+        return NextResponse.json(
+          { error: 'DALL-E not configured. Add OPENAI_API_KEY to enable.' },
+          { status: 400 }
+        );
+      }
+
+      // Determine DALL-E size based on platform
+      let dalleSize: string = '1792x1024';
+      if (height > width) {
+        dalleSize = '1024x1792';
+      } else if (Math.abs(width - height) < 200) {
+        dalleSize = '1024x1024';
+      }
+
+      // Check cost limits
+      const costCheck = await checkAndRecordCost(dalleSize);
+      if (!costCheck.allowed) {
+        return NextResponse.json(
+          { error: `DALL-E ${costCheck.reason}. Try free AI mode instead.` },
+          { status: 429 }
+        );
+      }
+
+      const prompt = body.customPrompt || generatePrompt(body);
+
+      try {
+        const response = await fetch('https://api.openai.com/v1/images/generations', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${openaiApiKey}`,
+          },
+          body: JSON.stringify({
+            model: 'dall-e-3',
+            prompt,
+            n: 1,
+            size: dalleSize,
+            quality: 'standard',
+            response_format: 'url',
+          }),
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({})) as { error?: { message?: string } };
+          throw new Error(errorData.error?.message || 'DALL-E API error');
+        }
+
+        const data = await response.json() as { data: Array<{ url: string }> };
+        const imageUrl = data.data[0]?.url;
+
+        if (!imageUrl) {
+          throw new Error('No image URL returned');
+        }
+
+        const [dalleWidth, dalleHeight] = dalleSize.split('x').map(Number);
+        result = {
+          url: imageUrl,
+          width: dalleWidth,
+          height: dalleHeight,
+          platform: body.platform,
+          style: body.style,
+          prompt,
+          cost: costCheck.cost,
+        };
+      } catch (err) {
+        return NextResponse.json(
+          { error: `DALL-E generation failed: ${err instanceof Error ? err.message : 'Unknown error'}` },
+          { status: 500 }
+        );
+      }
+    } else if (body.mode === 'ai') {
       // Use Pollinations AI (free, no API key required)
-      const prompt = generatePrompt(body);
+      // Use custom prompt if provided, otherwise generate one
+      const prompt = body.customPrompt || generatePrompt(body);
       const encodedPrompt = encodeURIComponent(prompt);
-      const imageUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=${width}&height=${height}&nologo=true`;
+
+      // Apply quality scaling for preview mode
+      const quality = body.quality || 'final';
+      const scale = IMAGE_QUALITIES[quality]?.scale || 1;
+      const scaledWidth = Math.round(width * scale);
+      const scaledHeight = Math.round(height * scale);
+
+      const imageUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=${scaledWidth}&height=${scaledHeight}&nologo=true`;
 
       result = {
         url: imageUrl,
-        width,
-        height,
+        width: scaledWidth,
+        height: scaledHeight,
         platform: body.platform,
         style: body.style,
         prompt,

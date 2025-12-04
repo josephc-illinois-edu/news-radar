@@ -5,6 +5,7 @@
 
 import { promises as fs } from 'fs';
 import path from 'path';
+import { checkCostLimits, recordCost, getCostStatus } from './dalle-costs.js';
 
 /**
  * Image generation options
@@ -31,6 +32,7 @@ export interface GeneratedImage {
   platform: string;
   style: string;
   source: 'dalle' | 'pollinations' | 'placeholder';
+  cost?: number;
 }
 
 /**
@@ -152,6 +154,10 @@ No text in the image. Abstract or symbolic representation. High quality, profess
       throw new Error('No image URL returned from DALL-E');
     }
 
+    // Record cost after successful generation
+    const { cost, tracker } = await recordCost(dalleSize);
+    console.log(`DALL-E cost: ${cost.toFixed(2)} | Today: ${tracker.daily.cost.toFixed(2)} | Month: ${tracker.monthly.cost.toFixed(2)}`);
+
     return {
       url: imageUrl,
       prompt,
@@ -160,6 +166,7 @@ No text in the image. Abstract or symbolic representation. High quality, profess
       platform: options.platform,
       style,
       source: 'dalle' as const,
+      cost,
     };
   }
 

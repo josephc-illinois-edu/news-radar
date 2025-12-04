@@ -8,11 +8,15 @@ export interface ImageGenerationOptions {
   platform: ImagePlatform;
   style: ImageStyle;
   mode: GenerateMode;
+  quality?: ImageQuality;
+  customPrompt?: string;
 }
+
+export type ImageQuality = 'preview' | 'final';
 
 export type ImagePlatform = 'facebook' | 'linkedin' | 'twitter' | 'instagram' | 'blog';
 export type ImageStyle = 'modern' | 'minimal' | 'bold' | 'gradient' | 'photo';
-export type GenerateMode = 'ai' | 'placeholder';
+export type GenerateMode = 'dalle' | 'ai' | 'placeholder';
 
 export interface GeneratedImage {
   url: string;
@@ -21,6 +25,7 @@ export interface GeneratedImage {
   platform: ImagePlatform;
   style: ImageStyle;
   prompt?: string;
+  cost?: number;
 }
 
 export const PLATFORM_CONFIGS = {
@@ -40,6 +45,23 @@ export const IMAGE_STYLES = {
 } as const;
 
 export const GENERATE_MODES = {
+  dalle: { name: 'DALL-E 3', description: 'Premium AI (~$0.04-0.08/image)' },
   ai: { name: 'AI Generated', description: 'Uses Pollinations AI (free)' },
   placeholder: { name: 'Placeholder', description: 'SVG with gradient background' },
 } as const;
+
+export const IMAGE_QUALITIES = {
+  preview: { name: 'Preview', description: 'Fast, lower resolution for iteration', scale: 0.5 },
+  final: { name: 'Final', description: 'Full resolution for publishing', scale: 1 },
+} as const;
+
+export interface PromptSuggestion {
+  prompt: string;
+  description: string;
+}
+
+export interface SuggestPromptsResponse {
+  suggestions: PromptSuggestion[];
+  source: 'ai' | 'fallback';
+  error?: string;
+}

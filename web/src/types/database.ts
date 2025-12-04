@@ -3,6 +3,8 @@
  * Mirrors the schema from src/services/database.ts
  */
 
+import type { ImagePlatform, ImageStyle } from './graphics';
+
 export interface DBUser {
   id: string;
   email: string;
@@ -32,6 +34,8 @@ export interface DBArticle {
   published_at?: string;
   keywords?: string[];
   hashtags?: string[];
+  featured_image_platform?: ImagePlatform;
+  featured_image_style?: ImageStyle;
   view_count: number;
   created_at: string;
   updated_at: string;
@@ -101,6 +105,8 @@ export interface CreateArticleInput {
   tone_criticism?: number;
   keywords?: string[];
   hashtags?: string[];
+  featured_image_platform?: ImagePlatform;
+  featured_image_style?: ImageStyle;
   status?: 'draft' | 'published' | 'archived';
 }
 
