@@ -16,6 +16,11 @@ export async function GET(
     const { id } = await context.params;
     const supabase = await createClient();
 
+    // Return empty array if Supabase is not configured
+    if (!supabase) {
+      return NextResponse.json<ApiResponse<DBSource[]>>({ data: [] });
+    }
+
     const { data, error } = await supabase
       .from('sources')
       .select('*')

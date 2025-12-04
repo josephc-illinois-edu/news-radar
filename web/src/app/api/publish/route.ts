@@ -87,10 +87,13 @@ const publishers: Record<PublishPlatform, (content: string, extra?: string) => P
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
 
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    // Check auth if Supabase is configured
+    if (supabase) {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      }
     }
 
     const body: PublishRequest = await request.json();
@@ -103,15 +106,21 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'At least one platform is required' }, { status: 400 });
     }
 
-    // Fetch the article
-    const { data: article, error: articleError } = await supabase
-      .from('articles')
-      .select('*')
-      .eq('id', body.articleId)
-      .single();
+    // Demo article for when Supabase is not configured
+    let article = { id: body.articleId, title: 'Demo Article', content: 'Demo content for publishing.' };
 
-    if (articleError || !article) {
-      return NextResponse.json({ error: 'Article not found' }, { status: 404 });
+    // Fetch the article if Supabase is configured
+    if (supabase) {
+      const { data, error: articleError } = await supabase
+        .from('articles')
+        .select('*')
+        .eq('id', body.articleId)
+        .single();
+
+      if (articleError || !data) {
+        return NextResponse.json({ error: 'Article not found' }, { status: 404 });
+      }
+      article = data;
     }
 
     // If scheduled, save the schedule and return
@@ -121,31 +130,41 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'Scheduled time must be in the future' }, { status: 400 });
       }
 
-      // Save scheduled posts
-      const scheduledPosts = body.platforms.map(platform => ({
-        article_id: body.articleId,
-        platform,
-        status: 'scheduled',
-        scheduled_at: body.scheduledAt,
-        content: body.customContent?.[platform] || article.content,
-        image_url: body.imageUrl,
-        user_id: user.id,
-      }));
+      // Save scheduled posts if Supabase is configured
+      if (supabase) {
+        const { data: { user } } = await supabase.auth.getUser();
+        const scheduledPosts = body.platforms.map(platform => ({
+          article_id: body.articleId,
+          platform,
+          status: 'scheduled',
+          scheduled_at: body.scheduledAt,
+          content: body.customContent?.[platform] || article.content,
+          image_url: body.imageUrl,
+          user_id: user?.id,
+        }));
 
-      const { data: savedPosts, error: saveError } = await supabase
-        .from('published_posts')
-        .insert(scheduledPosts)
-        .select();
+        const { data: savedPosts, error: saveError } = await supabase
+          .from('published_posts')
+          .insert(scheduledPosts)
+          .select();
 
-      if (saveError) {
-        console.error('Failed to schedule posts:', saveError);
-        return NextResponse.json({ error: 'Failed to schedule posts' }, { status: 500 });
+        if (saveError) {
+          console.error('Failed to schedule posts:', saveError);
+          return NextResponse.json({ error: 'Failed to schedule posts' }, { status: 500 });
+        }
+
+        return NextResponse.json({
+          message: 'Posts scheduled successfully',
+          scheduledAt: body.scheduledAt,
+          posts: savedPosts,
+        });
       }
 
+      // Demo mode for scheduling
       return NextResponse.json({
-        message: 'Posts scheduled successfully',
+        message: 'Posts scheduled successfully (demo mode)',
         scheduledAt: body.scheduledAt,
-        posts: savedPosts,
+        posts: body.platforms.map(p => ({ platform: p, status: 'scheduled' })),
       });
     }
 
@@ -159,16 +178,19 @@ export async function POST(request: NextRequest) {
         const result = await publisher(content, article.title);
         results.push(result);
 
-        // Save the published post record
-        await supabase.from('published_posts').insert({
-          article_id: body.articleId,
-          platform,
-          status: result.status,
-          url: result.url,
-          post_id: result.postId,
-          published_at: result.publishedAt,
-          user_id: user.id,
-        });
+        // Save the published post record if Supabase is configured
+        if (supabase) {
+          const { data: { user } } = await supabase.auth.getUser();
+          await supabase.from('published_posts').insert({
+            article_id: body.articleId,
+            platform,
+            status: result.status,
+            url: result.url,
+            post_id: result.postId,
+            published_at: result.publishedAt,
+            user_id: user?.id,
+          });
+        }
       } catch (err) {
         results.push({
           platform,
@@ -180,7 +202,7 @@ export async function POST(request: NextRequest) {
 
     // Update article status if any publish succeeded
     const anySuccess = results.some(r => r.status === 'published');
-    if (anySuccess) {
+    if (anySuccess && supabase) {
       await supabase
         .from('articles')
         .update({ status: 'published', published_at: new Date().toISOString() })
@@ -200,6 +222,12 @@ export async function POST(request: NextRequest) {
 export async function GET(request: NextRequest) {
   try {
     const supabase = await createClient();
+
+    // Return demo data if Supabase is not configured
+    if (!supabase) {
+      return NextResponse.json({ data: [] });
+    }
+
     const { data: { user } } = await supabase.auth.getUser();
 
     if (!user) {

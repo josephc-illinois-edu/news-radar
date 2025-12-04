@@ -16,6 +16,23 @@ export async function POST(
     const { id } = await context.params;
     const supabase = await createClient();
 
+    // Return demo response if Supabase is not configured
+    if (!supabase) {
+      return NextResponse.json<ApiResponse<DBArticle>>({
+        data: {
+          id,
+          title: 'Demo Article',
+          content: 'Demo content',
+          status: 'published',
+          view_count: 0,
+          published_at: new Date().toISOString(),
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        },
+        message: 'Article published (demo mode)'
+      });
+    }
+
     const { data, error } = await supabase
       .from('articles')
       .update({

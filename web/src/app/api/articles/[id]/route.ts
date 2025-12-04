@@ -10,6 +10,17 @@ import type { UpdateArticleInput, ApiResponse, DBArticle } from '@/types/databas
 
 type RouteContext = { params: Promise<{ id: string }> };
 
+// Demo article for when Supabase is not configured
+const getDemoArticle = (id: string): DBArticle => ({
+  id,
+  title: 'Demo Article',
+  content: 'This is demo content for the article.',
+  status: 'draft',
+  view_count: 0,
+  created_at: new Date().toISOString(),
+  updated_at: new Date().toISOString(),
+});
+
 export async function GET(
   request: NextRequest,
   context: RouteContext
@@ -17,6 +28,11 @@ export async function GET(
   try {
     const { id } = await context.params;
     const supabase = await createClient();
+
+    // Return demo data if Supabase is not configured
+    if (!supabase) {
+      return NextResponse.json<ApiResponse<DBArticle>>({ data: getDemoArticle(id) });
+    }
 
     const { data, error } = await supabase
       .from('articles')
@@ -54,6 +70,14 @@ export async function PATCH(
     const { id } = await context.params;
     const supabase = await createClient();
     const body: UpdateArticleInput = await request.json();
+
+    // Return demo response if Supabase is not configured
+    if (!supabase) {
+      return NextResponse.json<ApiResponse<DBArticle>>({
+        data: { ...getDemoArticle(id), ...body },
+        message: 'Article updated (demo mode)'
+      });
+    }
 
     const { data, error } = await supabase
       .from('articles')
@@ -94,6 +118,13 @@ export async function DELETE(
   try {
     const { id } = await context.params;
     const supabase = await createClient();
+
+    // Return success if Supabase is not configured
+    if (!supabase) {
+      return NextResponse.json<ApiResponse<null>>({
+        message: 'Article deleted (demo mode)'
+      });
+    }
 
     const { error } = await supabase
       .from('articles')

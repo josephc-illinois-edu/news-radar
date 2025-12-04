@@ -8,13 +8,26 @@ const protectedRoutes = ['/dashboard', '/articles', '/research', '/create', '/gr
 const authRoutes = ['/login', '/signup'];
 
 export async function middleware(request: NextRequest) {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+  // If Supabase is not configured, allow all routes (demo mode)
+  if (!supabaseUrl || !supabaseKey) {
+    return NextResponse.next();
+  }
+
+  // DEV MODE: Skip auth in development (remove this block for production)
+  if (process.env.NODE_ENV === 'development') {
+    return NextResponse.next();
+  }
+
   let supabaseResponse = NextResponse.next({
     request,
   });
 
   const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    supabaseUrl,
+    supabaseKey,
     {
       cookies: {
         getAll() {

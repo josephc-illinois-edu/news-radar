@@ -4,6 +4,15 @@ import { createClient } from '@/lib/supabase/server';
 async function getStats() {
   const supabase = await createClient();
 
+  // Return demo stats if Supabase is not configured
+  if (!supabase) {
+    return {
+      total: 3,
+      published: 1,
+      drafts: 2,
+    };
+  }
+
   const [articlesResult, publishedResult, draftsResult] = await Promise.all([
     supabase.from('articles').select('*', { count: 'exact', head: true }),
     supabase.from('articles').select('*', { count: 'exact', head: true }).eq('status', 'published'),
