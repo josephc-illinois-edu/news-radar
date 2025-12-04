@@ -1,0 +1,522 @@
+/**
+ * Scanner API
+ * GET /api/scanner - Get scanner dashboard data
+ * POST /api/scanner - Run a scan with options
+ */
+import { NextRequest, NextResponse } from 'next/server';
+import type { StoryResult } from '@/types/research';
+import type {
+  ScannerDashboard,
+  ScanRequest,
+  ScanResponse,
+  TrendingTopic,
+  SourceStat,
+  TopicCandidate,
+  calculateTrendingScore,
+} from '@/types/scanner';
+import { AVAILABLE_SOURCES } from '@/types/research';
+
+// === Source Scanners (reused from research/scan) ===
+
+async function scanHackerNews(limit: number = 20, hoursBack: number = 24): Promise<StoryResult[]> {
+  const now = Math.floor(Date.now() / 1000);
+  const cutoffTime = now - (hoursBack * 60 * 60);
+
+  const url = `https://hn.algolia.com/api/v1/search?` +
+    `tags=story&` +
+    `numericFilters=points>50,created_at_i>${cutoffTime}&` +
+    `hitsPerPage=${limit}`;
+
+  const response = await fetch(url);
+  if (!response.ok) throw new Error('HN API failed');
+
+  const data = await response.json();
+
+  return data.hits.map((hit: any) => {
+    const createdAt = new Date(hit.created_at_i * 1000);
+    const ageHours = (Date.now() - createdAt.getTime()) / (1000 * 60 * 60);
+    const velocity = (hit.points + hit.num_comments * 2) / Math.max(ageHours, 0.1);
+
+    return {
+      id: `hn-${hit.objectID}`,
+      title: hit.title,
+      url: hit.url || `https://news.ycombinator.com/item?id=${hit.objectID}`,
+      contentSnippet: hit.story_text || '',
+      publishedAt: createdAt.toISOString(),
+      score: hit.points,
+      commentCount: hit.num_comments,
+      engagementVelocity: velocity,
+      keywords: extractKeywords(hit.title),
+      topics: ['technology'],
+      sourceId: 'hackernews',
+      sourceName: 'HackerNews',
+      detectedAt: new Date().toISOString(),
+      status: 'flagged' as const,
+    };
+  });
+}
+
+async function scanLobsters(limit: number = 20): Promise<StoryResult[]> {
+  const response = await fetch('https://lobste.rs/hottest.json');
+  if (!response.ok) throw new Error('Lobsters API failed');
+
+  const stories = await response.json();
+
+  return stories.slice(0, limit).map((story: any) => {
+    const createdAt = new Date(story.created_at);
+    const ageHours = (Date.now() - createdAt.getTime()) / (1000 * 60 * 60);
+    const velocity = (story.score + story.comment_count * 2) / Math.max(ageHours, 0.1);
+
+    return {
+      id: `lobsters-${story.short_id}`,
+      title: story.title,
+      url: story.url || story.short_id_url,
+      contentSnippet: story.description || '',
+      publishedAt: createdAt.toISOString(),
+      score: story.score,
+      commentCount: story.comment_count,
+      engagementVelocity: velocity,
+      keywords: story.tags || [],
+      topics: ['technology'],
+      sourceId: 'lobsters',
+      sourceName: 'Lobsters',
+      detectedAt: new Date().toISOString(),
+      status: 'flagged' as const,
+    };
+  });
+}
+
+async function scanGuardian(limit: number = 20): Promise<StoryResult[]> {
+  const response = await fetch('https://www.theguardian.com/world/rss');
+  if (!response.ok) throw new Error('Guardian RSS failed');
+
+  const text = await response.text();
+  const items = parseRSS(text, limit);
+
+  return items.map((item, i) => ({
+    id: `guardian-${i}-${Date.now()}`,
+    title: item.title,
+    url: item.link,
+    contentSnippet: item.description,
+    publishedAt: item.pubDate,
+    score: 0,
+    commentCount: 0,
+    engagementVelocity: 0,
+    keywords: extractKeywords(item.title),
+    topics: ['world', 'news'],
+    sourceId: 'guardian',
+    sourceName: 'The Guardian',
+    detectedAt: new Date().toISOString(),
+    status: 'flagged' as const,
+  }));
+}
+
+async function scanRSSFeed(feedUrl: string, limit: number = 20): Promise<StoryResult[]> {
+  try {
+    const response = await fetch(feedUrl);
+    if (!response.ok) throw new Error(`RSS fetch failed: ${response.status}`);
+
+    const text = await response.text();
+    const items = parseRSS(text, limit);
+    const feedName = extractFeedName(text) || new URL(feedUrl).hostname;
+
+    return items.map((item, i) => ({
+      id: `rss-${feedUrl.slice(0, 20)}-${i}-${Date.now()}`,
+      title: item.title,
+      url: item.link,
+      contentSnippet: item.description,
+      publishedAt: item.pubDate,
+      score: 0,
+      commentCount: 0,
+      engagementVelocity: 0,
+      keywords: extractKeywords(item.title),
+      topics: ['news'],
+      sourceId: `rss-${new URL(feedUrl).hostname}`,
+      sourceName: feedName,
+      detectedAt: new Date().toISOString(),
+      status: 'flagged' as const,
+    }));
+  } catch (error) {
+    console.error(`RSS scan failed for ${feedUrl}:`, error);
+    return [];
+  }
+}
+
+// === RSS Parsing ===
+
+function parseRSS(xml: string, limit: number): Array<{ title: string; link: string; description: string; pubDate: string }> {
+  const items: Array<{ title: string; link: string; description: string; pubDate: string }> = [];
+  const itemRegex = /<item>([\s\S]*?)<\/item>/g;
+  let match;
+
+  while ((match = itemRegex.exec(xml)) !== null && items.length < limit) {
+    const itemXml = match[1];
+    const title = extractXmlContent(itemXml, 'title');
+    const link = extractXmlContent(itemXml, 'link');
+    const description = extractXmlContent(itemXml, 'description');
+    const pubDate = extractXmlContent(itemXml, 'pubDate');
+
+    items.push({
+      title: cleanCDATA(title),
+      link,
+      description: cleanCDATA(description).replace(/<[^>]+>/g, '').slice(0, 300),
+      pubDate: pubDate ? new Date(pubDate).toISOString() : new Date().toISOString(),
+    });
+  }
+
+  return items;
+}
+
+function extractXmlContent(xml: string, tag: string): string {
+  const cdataRegex = new RegExp(`<${tag}><![CDATA[(.*?)]]></${tag}>`, 's');
+  const simpleRegex = new RegExp(`<${tag}>(.*?)</${tag}>`, 's');
+
+  const cdataMatch = xml.match(cdataRegex);
+  if (cdataMatch) return cdataMatch[1];
+
+  const simpleMatch = xml.match(simpleRegex);
+  return simpleMatch ? simpleMatch[1] : '';
+}
+
+function cleanCDATA(text: string): string {
+  return text.replace(/<!\[CDATA\[|\]\]>/g, '').trim();
+}
+
+function extractFeedName(xml: string): string {
+  const titleMatch = xml.match(/<channel>[\s\S]*?<title><!\[CDATA\[(.*?)\]\]><\/title>|<channel>[\s\S]*?<title>(.*?)<\/title>/);
+  return titleMatch ? (titleMatch[1] || titleMatch[2] || '').trim() : '';
+}
+
+function extractKeywords(title: string): string[] {
+  const stopWords = new Set(['the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by', 'from', 'is', 'are', 'was', 'were', 'be', 'been', 'being', 'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'could', 'should', 'may', 'might', 'must', 'shall', 'can', 'need', 'dare', 'ought', 'used', 'this', 'that', 'these', 'those', 'it', 'its']);
+  return title
+    .toLowerCase()
+    .replace(/[^\w\s]/g, '')
+    .split(/\s+/)
+    .filter(word => word.length > 3 && !stopWords.has(word))
+    .slice(0, 8);
+}
+
+// === Topic Extraction ===
+
+function extractTopics(stories: StoryResult[]): TrendingTopic[] {
+  const topicMap = new Map<string, TopicCandidate>();
+
+  for (const story of stories) {
+    // Extract from keywords
+    for (const keyword of story.keywords) {
+      const normalized = keyword.toLowerCase().trim();
+      if (normalized.length < 3) continue;
+
+      const existing = topicMap.get(normalized);
+      if (existing) {
+        existing.mentionCount++;
+        existing.sourceIds.add(story.sourceId);
+        existing.storyIds.push(story.id);
+        existing.lastSeen = story.publishedAt;
+        existing.avgVelocity = (existing.avgVelocity + story.engagementVelocity) / 2;
+      } else {
+        topicMap.set(normalized, {
+          name: keyword,
+          normalizedName: normalized,
+          mentionCount: 1,
+          sourceIds: new Set([story.sourceId]),
+          storyIds: [story.id],
+          firstSeen: story.publishedAt,
+          lastSeen: story.publishedAt,
+          avgVelocity: story.engagementVelocity,
+        });
+      }
+    }
+  }
+
+  // Convert to TrendingTopic array, filter by minimum mentions
+  const totalSources = AVAILABLE_SOURCES.length;
+
+  return Array.from(topicMap.values())
+    .filter(t => t.mentionCount >= 2)
+    .map(t => {
+      const score = calculateTrendingScoreInternal(
+        t.mentionCount,
+        t.sourceIds.size,
+        t.avgVelocity,
+        totalSources,
+        0 // AI score added later
+      );
+
+      return {
+        id: `topic-${t.normalizedName}-${Date.now()}`,
+        name: t.name,
+        slug: t.normalizedName.replace(/\s+/g, '-'),
+        frequency: t.mentionCount,
+        sourceCount: t.sourceIds.size,
+        firstSeen: t.firstSeen,
+        lastSeen: t.lastSeen,
+        trendScore: score.total,
+        velocityScore: score.components.velocity,
+        aiPredictionScore: 0,
+        aiPredictionReason: undefined,
+        relatedStories: t.storyIds,
+        relatedKeywords: [],
+        peakHour: undefined,
+      };
+    })
+    .sort((a, b) => b.trendScore - a.trendScore)
+    .slice(0, 20);
+}
+
+function calculateTrendingScoreInternal(
+  mentionCount: number,
+  sourceCount: number,
+  avgVelocity: number,
+  totalSources: number,
+  aiScore: number = 0
+): { total: number; components: { frequency: number; sourceSpread: number; velocity: number; aiPrediction: number } } {
+  const frequency = Math.min(25, (mentionCount / 10) * 25);
+  const sourceSpread = (sourceCount / Math.max(totalSources, 1)) * 25;
+  const velocity = Math.min(25, (avgVelocity / 500) * 25);
+  const aiPrediction = Math.min(25, (aiScore / 100) * 25);
+
+  return {
+    total: Math.round(frequency + sourceSpread + velocity + aiPrediction),
+    components: {
+      frequency: Math.round(frequency),
+      sourceSpread: Math.round(sourceSpread),
+      velocity: Math.round(velocity),
+      aiPrediction: Math.round(aiPrediction),
+    },
+  };
+}
+
+// === Scan All Sources ===
+
+async function scanAllSources(request: ScanRequest): Promise<ScanResponse> {
+  const {
+    sources = ['hackernews', 'lobsters', 'guardian'],
+    customFeeds = [],
+    hoursBack = 24,
+    limit = 20,
+  } = request;
+
+  const allStories: StoryResult[] = [];
+  const sourceStats: SourceStat[] = [];
+  const errors: string[] = [];
+
+  // Scan built-in sources
+  for (const source of sources) {
+    const startTime = Date.now();
+    try {
+      let stories: StoryResult[] = [];
+
+      switch (source) {
+        case 'hackernews':
+          stories = await scanHackerNews(limit, hoursBack);
+          break;
+        case 'lobsters':
+          stories = await scanLobsters(limit);
+          break;
+        case 'guardian':
+          stories = await scanGuardian(limit);
+          break;
+        default:
+          console.log(`Source ${source} not implemented`);
+      }
+
+      allStories.push(...stories);
+
+      const sourceName = AVAILABLE_SOURCES.find(s => s.id === source)?.name || source;
+      sourceStats.push({
+        sourceId: source,
+        sourceName,
+        storiesFound: stories.length,
+        avgEngagement: stories.reduce((sum, s) => sum + s.engagementVelocity, 0) / Math.max(stories.length, 1),
+        lastSuccess: new Date().toISOString(),
+        errorCount: 0,
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      errors.push(`${source}: ${message}`);
+
+      const sourceName = AVAILABLE_SOURCES.find(s => s.id === source)?.name || source;
+      sourceStats.push({
+        sourceId: source,
+        sourceName,
+        storiesFound: 0,
+        avgEngagement: 0,
+        lastError: message,
+        errorCount: 1,
+      });
+    }
+  }
+
+  // Scan custom RSS feeds
+  for (const feedUrl of customFeeds) {
+    try {
+      const stories = await scanRSSFeed(feedUrl, limit);
+      allStories.push(...stories);
+
+      const hostname = new URL(feedUrl).hostname;
+      sourceStats.push({
+        sourceId: `rss-${hostname}`,
+        sourceName: hostname,
+        storiesFound: stories.length,
+        avgEngagement: 0,
+        lastSuccess: new Date().toISOString(),
+        errorCount: 0,
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      errors.push(`RSS ${feedUrl}: ${message}`);
+    }
+  }
+
+  // Sort stories by engagement velocity
+  allStories.sort((a, b) => b.engagementVelocity - a.engagementVelocity);
+
+  // Extract trending topics
+  const topics = extractTopics(allStories);
+
+  return {
+    stories: allStories,
+    topics,
+    sourceStats,
+    scanTime: new Date().toISOString(),
+    totalFound: allStories.length,
+    errors: errors.length > 0 ? errors : undefined,
+  };
+}
+
+// === Demo Data ===
+
+function generateDemoDashboard(): ScannerDashboard {
+  const now = new Date();
+
+  return {
+    lastScanTime: new Date(now.getTime() - 5 * 60 * 1000).toISOString(),
+    totalStoriesScanned: 127,
+    trendingTopics: [
+      {
+        id: 'topic-ai-demo',
+        name: 'artificial intelligence',
+        slug: 'artificial-intelligence',
+        frequency: 23,
+        sourceCount: 4,
+        firstSeen: new Date(now.getTime() - 6 * 60 * 60 * 1000).toISOString(),
+        lastSeen: now.toISOString(),
+        trendScore: 78,
+        velocityScore: 18,
+        aiPredictionScore: 22,
+        aiPredictionReason: 'High cross-source coverage with accelerating engagement',
+        relatedStories: ['hn-1', 'hn-2', 'lobsters-1'],
+        relatedKeywords: ['machine learning', 'gpt', 'llm'],
+        peakHour: 14,
+      },
+      {
+        id: 'topic-climate-demo',
+        name: 'climate change',
+        slug: 'climate-change',
+        frequency: 15,
+        sourceCount: 3,
+        firstSeen: new Date(now.getTime() - 8 * 60 * 60 * 1000).toISOString(),
+        lastSeen: now.toISOString(),
+        trendScore: 62,
+        velocityScore: 14,
+        aiPredictionScore: 18,
+        aiPredictionReason: 'Recurring topic with policy implications',
+        relatedStories: ['guardian-1', 'guardian-2'],
+        relatedKeywords: ['environment', 'carbon', 'renewable'],
+        peakHour: 10,
+      },
+      {
+        id: 'topic-startup-demo',
+        name: 'startup funding',
+        slug: 'startup-funding',
+        frequency: 12,
+        sourceCount: 2,
+        firstSeen: new Date(now.getTime() - 4 * 60 * 60 * 1000).toISOString(),
+        lastSeen: now.toISOString(),
+        trendScore: 48,
+        velocityScore: 12,
+        aiPredictionScore: 10,
+        aiPredictionReason: 'Tech sector interest but limited mainstream reach',
+        relatedStories: ['hn-3', 'lobsters-2'],
+        relatedKeywords: ['venture capital', 'series a', 'fundraising'],
+        peakHour: 16,
+      },
+    ],
+    topStories: [
+      {
+        id: 'demo-hn-1',
+        title: 'OpenAI Announces New Model with Improved Reasoning',
+        url: 'https://example.com/openai-new-model',
+        contentSnippet: 'OpenAI has released a new AI model that demonstrates significant improvements in logical reasoning...',
+        publishedAt: new Date(now.getTime() - 2 * 60 * 60 * 1000).toISOString(),
+        score: 856,
+        commentCount: 423,
+        engagementVelocity: 285,
+        keywords: ['openai', 'artificial', 'intelligence', 'reasoning'],
+        topics: ['technology'],
+        sourceId: 'hackernews',
+        sourceName: 'HackerNews',
+        detectedAt: now.toISOString(),
+        status: 'flagged',
+      },
+      {
+        id: 'demo-guardian-1',
+        title: 'World Leaders Gather for Climate Summit',
+        url: 'https://example.com/climate-summit',
+        contentSnippet: 'Leaders from over 100 countries are meeting to discuss new climate commitments...',
+        publishedAt: new Date(now.getTime() - 4 * 60 * 60 * 1000).toISOString(),
+        score: 0,
+        commentCount: 0,
+        engagementVelocity: 0,
+        keywords: ['climate', 'summit', 'leaders', 'world'],
+        topics: ['news', 'world'],
+        sourceId: 'guardian',
+        sourceName: 'The Guardian',
+        detectedAt: now.toISOString(),
+        status: 'flagged',
+      },
+    ],
+    sourceStats: [
+      { sourceId: 'hackernews', sourceName: 'HackerNews', storiesFound: 47, avgEngagement: 125.3, lastSuccess: now.toISOString(), errorCount: 0 },
+      { sourceId: 'lobsters', sourceName: 'Lobsters', storiesFound: 32, avgEngagement: 45.8, lastSuccess: now.toISOString(), errorCount: 0 },
+      { sourceId: 'guardian', sourceName: 'The Guardian', storiesFound: 48, avgEngagement: 0, lastSuccess: now.toISOString(), errorCount: 0 },
+    ],
+    recentScans: [
+      { id: 'scan-1', timestamp: new Date(now.getTime() - 5 * 60 * 1000).toISOString(), sourcesScanned: ['hackernews', 'lobsters', 'guardian'], storiesFound: 127, newTopics: 3, durationMs: 2340 },
+      { id: 'scan-2', timestamp: new Date(now.getTime() - 35 * 60 * 1000).toISOString(), sourcesScanned: ['hackernews', 'lobsters', 'guardian'], storiesFound: 124, newTopics: 2, durationMs: 2180 },
+    ],
+  };
+}
+
+// === API Handlers ===
+
+export async function GET() {
+  try {
+    // For demo mode, return mock dashboard
+    // In production, this would fetch from Supabase or run a fresh scan
+    const dashboard = generateDemoDashboard();
+    return NextResponse.json(dashboard);
+  } catch (error) {
+    console.error('Scanner GET error:', error);
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : 'Failed to get scanner data' },
+      { status: 500 }
+    );
+  }
+}
+
+export async function POST(request: NextRequest) {
+  try {
+    const body: ScanRequest = await request.json();
+    const result = await scanAllSources(body);
+    return NextResponse.json(result);
+  } catch (error) {
+    console.error('Scanner POST error:', error);
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : 'Scan failed' },
+      { status: 500 }
+    );
+  }
+}

@@ -4,57 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 
-const navigation = [
-  { name: 'Dashboard', href: '/dashboard', icon: HomeIcon },
-  { name: 'Articles', href: '/dashboard/articles', icon: DocumentIcon },
-  { name: 'Research', href: '/dashboard/research', icon: SearchIcon },
-  { name: 'Create', href: '/dashboard/create', icon: PlusIcon },
-  { name: 'Graphics', href: '/dashboard/graphics', icon: ImageIcon },
-  { name: 'Publish', href: '/dashboard/publish', icon: SendIcon },
-  { name: 'Engage', href: '/dashboard/engage', icon: ChatIcon },
-  { name: 'Analytics', href: '/dashboard/analytics', icon: ChartIcon },
-];
-
-export function Sidebar() {
-  const pathname = usePathname();
-
-  return (
-    <div className="hidden lg:fixed lg:inset-y-0 lg:z-50 lg:flex lg:w-64 lg:flex-col">
-      <div className="flex grow flex-col gap-y-5 overflow-y-auto border-r bg-card px-6 pb-4">
-        <div className="flex h-16 shrink-0 items-center">
-          <Link href="/dashboard" className="text-xl font-bold">
-            News Radar
-          </Link>
-        </div>
-        <nav className="flex flex-1 flex-col">
-          <ul role="list" className="flex flex-1 flex-col gap-y-1">
-            {navigation.map((item) => {
-              const isActive = pathname === item.href || pathname.startsWith(item.href + '/');
-              return (
-                <li key={item.name}>
-                  <Link
-                    href={item.href}
-                    className={cn(
-                      'group flex gap-x-3 rounded-md p-2 text-sm font-medium transition-colors',
-                      isActive
-                        ? 'bg-primary text-primary-foreground'
-                        : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
-                    )}
-                  >
-                    <item.icon className="h-5 w-5 shrink-0" />
-                    {item.name}
-                  </Link>
-                </li>
-              );
-            })}
-          </ul>
-        </nav>
-      </div>
-    </div>
-  );
-}
-
-// Simple icon components
+// Icon components (defined before navigation array to avoid hoisting issues)
 function HomeIcon({ className }: { className?: string }) {
   return (
     <svg className={className} fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
@@ -67,6 +17,14 @@ function DocumentIcon({ className }: { className?: string }) {
   return (
     <svg className={className} fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
       <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
+    </svg>
+  );
+}
+
+function RadarIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M9.348 14.651a3.75 3.75 0 010-5.303m5.304 0a3.75 3.75 0 010 5.303m-7.425 2.122a6.75 6.75 0 010-9.546m9.546 0a6.75 6.75 0 010 9.546M5.106 18.894c-3.808-3.808-3.808-9.98 0-13.789m13.788 0c3.808 3.808 3.808 9.981 0 13.79M12 12h.008v.007H12V12zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" />
     </svg>
   );
 }
@@ -116,5 +74,56 @@ function ChartIcon({ className }: { className?: string }) {
     <svg className={className} fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
       <path strokeLinecap="round" strokeLinejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z" />
     </svg>
+  );
+}
+
+const navigation = [
+  { name: 'Dashboard', href: '/dashboard', icon: HomeIcon },
+  { name: 'Articles', href: '/dashboard/articles', icon: DocumentIcon },
+  { name: 'Scanner', href: '/dashboard/scanner', icon: RadarIcon },
+  { name: 'Research', href: '/dashboard/research', icon: SearchIcon },
+  { name: 'Create', href: '/dashboard/create', icon: PlusIcon },
+  { name: 'Graphics', href: '/dashboard/graphics', icon: ImageIcon },
+  { name: 'Publish', href: '/dashboard/publish', icon: SendIcon },
+  { name: 'Engage', href: '/dashboard/engage', icon: ChatIcon },
+  { name: 'Analytics', href: '/dashboard/analytics', icon: ChartIcon },
+];
+
+export function Sidebar() {
+  const pathname = usePathname();
+
+  return (
+    <div className="hidden lg:fixed lg:inset-y-0 lg:z-50 lg:flex lg:w-64 lg:flex-col">
+      <div className="flex grow flex-col gap-y-5 overflow-y-auto border-r bg-card px-6 pb-4">
+        <div className="flex h-16 shrink-0 items-center">
+          <Link href="/dashboard" className="text-xl font-bold">
+            News Radar
+          </Link>
+        </div>
+        <nav className="flex flex-1 flex-col">
+          <ul role="list" className="flex flex-1 flex-col gap-y-1">
+            {navigation.map((item) => {
+              const isActive = pathname === item.href || pathname.startsWith(item.href + '/');
+              return (
+                <li key={item.name}>
+                  <Link
+                    href={item.href}
+                    className={cn(
+                      'group flex gap-x-3 rounded-md p-2 text-sm font-medium transition-colors',
+                      isActive
+                        ? 'bg-primary text-primary-foreground'
+                        : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
+                    )}
+                  >
+                    <item.icon className="h-5 w-5 shrink-0" />
+                    {item.name}
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        </nav>
+      </div>
+    </div>
   );
 }

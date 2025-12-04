@@ -1,18 +1,26 @@
 'use client';
 
 import { useState } from 'react';
-import { useScanSources } from '@/hooks/use-research';
+import Link from 'next/link';
+import { useScanSources, useArticleSelection } from '@/hooks/use-research';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Input } from '@/components/ui/input';
+import { Checkbox } from '@/components/ui/checkbox';
 import { AVAILABLE_SOURCES, type StoryResult, type SourceId } from '@/types/research';
 
 export default function ResearchPage() {
   const [selectedSources, setSelectedSources] = useState<SourceId[]>(['hackernews']);
   const [results, setResults] = useState<StoryResult[]>([]);
   const scanMutation = useScanSources();
+  const {
+    selected: selectedArticles,
+    isSelected,
+    toggleSelection,
+    clearSelection,
+    canAddMore,
+  } = useArticleSelection();
 
   const toggleSource = (sourceId: SourceId) => {
     setSelectedSources((prev) =>
@@ -121,6 +129,32 @@ export default function ResearchPage() {
         </div>
       )}
 
+      {/* Selection Bar */}
+      {selectedArticles.length > 0 && (
+        <Card className="bg-primary/5 border-primary/20">
+          <CardContent className="py-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <Badge variant="secondary">{selectedArticles.length} selected</Badge>
+                <span className="text-sm text-muted-foreground">
+                  {selectedArticles.map(s => s.title.slice(0, 20)).join(', ')}...
+                </span>
+              </div>
+              <div className="flex gap-2">
+                <Button variant="ghost" size="sm" onClick={clearSelection}>
+                  Clear
+                </Button>
+                <Button size="sm" asChild disabled={selectedArticles.length < 2}>
+                  <Link href={`/dashboard/research/compare?articles=${selectedArticles.map(s => s.id).join(',')}`}>
+                    Compare ({selectedArticles.length})
+                  </Link>
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Results */}
       {results.length > 0 && !scanMutation.isPending && (
         <div className="space-y-4">
@@ -129,12 +163,18 @@ export default function ResearchPage() {
               Results ({results.length} stories)
             </h2>
             <p className="text-sm text-muted-foreground">
-              Sorted by engagement velocity
+              Sorted by engagement velocity • Click to select for comparison
             </p>
           </div>
 
           {results.map((story) => (
-            <StoryCard key={story.id} story={story} />
+            <StoryCard
+              key={story.id}
+              story={story}
+              isSelected={isSelected(story.id)}
+              onToggle={() => toggleSelection(story)}
+              canSelect={canAddMore || isSelected(story.id)}
+            />
           ))}
         </div>
       )}
@@ -153,14 +193,30 @@ export default function ResearchPage() {
   );
 }
 
-function StoryCard({ story }: { story: StoryResult }) {
+function StoryCard({
+  story,
+  isSelected,
+  onToggle,
+  canSelect,
+}: {
+  story: StoryResult;
+  isSelected: boolean;
+  onToggle: () => void;
+  canSelect: boolean;
+}) {
   const velocity = story.engagementVelocity.toFixed(1);
   const publishedAgo = getTimeAgo(new Date(story.publishedAt));
 
   return (
-    <Card className="hover:bg-accent/50 transition-colors">
+    <Card className={`transition-colors ${isSelected ? 'border-primary bg-primary/5' : 'hover:bg-accent/50'}`}>
       <CardContent className="pt-6">
-        <div className="flex items-start justify-between gap-4">
+        <div className="flex items-start gap-4">
+          <Checkbox
+            checked={isSelected}
+            onCheckedChange={onToggle}
+            disabled={!canSelect && !isSelected}
+            className="mt-1"
+          />
           <div className="flex-1 min-w-0">
             <a
               href={story.url}
@@ -196,7 +252,7 @@ function StoryCard({ story }: { story: StoryResult }) {
             <div className="text-xs text-muted-foreground">velocity</div>
           </div>
         </div>
-        <div className="mt-4 flex gap-2">
+        <div className="mt-4 flex gap-2 ml-8">
           <Button size="sm" variant="outline" asChild>
             <a href={story.url} target="_blank" rel="noopener noreferrer">
               Read Article
