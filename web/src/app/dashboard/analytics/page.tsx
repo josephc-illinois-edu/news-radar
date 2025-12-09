@@ -22,6 +22,7 @@ export default function AnalyticsPage() {
   const [timeRange, setTimeRange] = useState<TimeRange>('30d');
   const [data, setData] = useState<AnalyticsDashboard | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     loadAnalytics();
@@ -29,12 +30,20 @@ export default function AnalyticsPage() {
 
   const loadAnalytics = async () => {
     setIsLoading(true);
+    setError(null);
     try {
       const response = await fetch(`/api/analytics?timeRange=${timeRange}`);
       const result = await response.json();
-      setData(result);
+      if (!response.ok || result.error) {
+        setError(result.error || 'Failed to load analytics');
+        setData(null);
+      } else {
+        setData(result);
+      }
     } catch (err) {
       console.error('Failed to load analytics:', err);
+      setError('Failed to load analytics');
+      setData(null);
     } finally {
       setIsLoading(false);
     }
@@ -46,7 +55,7 @@ export default function AnalyticsPage() {
     return num.toString();
   };
 
-  if (isLoading || !data) {
+  if (isLoading) {
     return (
       <div className="space-y-6">
         <div>
@@ -62,6 +71,25 @@ export default function AnalyticsPage() {
             </Card>
           ))}
         </div>
+      </div>
+    );
+  }
+
+  if (error || !data) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-3xl font-bold">Analytics</h1>
+          <p className="text-muted-foreground">Track your content performance</p>
+        </div>
+        <Card>
+          <CardContent className="pt-6">
+            <p className="text-destructive">{error || 'Failed to load analytics data'}</p>
+            <Button onClick={loadAnalytics} variant="outline" className="mt-4">
+              Retry
+            </Button>
+          </CardContent>
+        </Card>
       </div>
     );
   }

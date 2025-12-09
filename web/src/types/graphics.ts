@@ -14,7 +14,7 @@ export interface ImageGenerationOptions {
 
 export type ImageQuality = 'preview' | 'final';
 
-export type ImagePlatform = 'facebook' | 'linkedin' | 'twitter' | 'instagram' | 'blog';
+export type ImagePlatform = 'facebook' | 'linkedin' | 'twitter' | 'instagram' | 'blog' | 'blog_hd';
 export type ImageStyle = 'modern' | 'minimal' | 'bold' | 'gradient' | 'photo';
 export type GenerateMode = 'dalle' | 'ai' | 'placeholder';
 
@@ -33,7 +33,8 @@ export const PLATFORM_CONFIGS = {
   linkedin: { width: 1200, height: 627, name: 'LinkedIn', ratio: '1.91:1' },
   twitter: { width: 1200, height: 675, name: 'Twitter/X', ratio: '16:9' },
   instagram: { width: 1080, height: 1080, name: 'Instagram', ratio: '1:1' },
-  blog: { width: 1200, height: 800, name: 'Blog', ratio: '3:2' },
+  blog: { width: 1500, height: 844, name: 'Blog', ratio: '16:9' },
+  blog_hd: { width: 2500, height: 1406, name: 'Blog HD', ratio: '16:9' },
 } as const;
 
 export const IMAGE_STYLES = {

@@ -6,7 +6,8 @@
       "SlashCommand(/bill-decide)",
       "Bash(cat:*)",
       "Bash(npx tsc:*)",
-      "Bash(grep:*)"
+      "Bash(grep:*)",
+      "WebSearch"
     ],
     "deny": [],
     "ask": []

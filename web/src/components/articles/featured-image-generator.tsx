@@ -778,11 +778,10 @@ export function FeaturedImageGenerator({
       <Dialog open={showImageLibrary} onOpenChange={setShowImageLibrary}>
         <DialogContent
           className="w-[95vw] max-w-4xl max-h-[85vh] overflow-hidden flex flex-col"
-          aria-labelledby="library-dialog-title"
           aria-describedby="library-dialog-description"
         >
           <DialogHeader>
-            <DialogTitle id="library-dialog-title">Image Library</DialogTitle>
+            <DialogTitle>Image Library</DialogTitle>
             <p id="library-dialog-description" className="text-sm text-muted-foreground">
               Click an image to use it as the featured image for this article.
             </p>

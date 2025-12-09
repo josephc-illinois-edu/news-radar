@@ -91,7 +91,13 @@ function generatePrompt(options: ImageGenerationOptions): string {
   const stylePrompt = STYLE_PROMPTS[options.style] || STYLE_PROMPTS.modern;
   const platformConfig = PLATFORM_CONFIGS[options.platform];
 
-  return `Social media graphic for ${platformConfig.name}: "${options.title}"${options.subtitle ? `. ${options.subtitle}` : ''}. ${stylePrompt}. Professional quality, suitable for business use.`;
+  // Add center-focused composition for blog images (Medium and other platforms crop edges)
+  const isBlogPlatform = options.platform === 'blog' || options.platform === 'blog_hd';
+  const compositionGuide = isBlogPlatform
+    ? 'Center-focused composition with main subject in the middle third, safe for cropping on edges.'
+    : '';
+
+  return `Social media graphic for ${platformConfig.name}: "${options.title}"${options.subtitle ? `. ${options.subtitle}` : ''}. ${stylePrompt}. ${compositionGuide} Professional quality, suitable for business use.`.replace(/\s+/g, ' ').trim();
 }
 
 function generatePlaceholderSVG(options: ImageGenerationOptions): string {

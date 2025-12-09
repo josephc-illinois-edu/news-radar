@@ -22,7 +22,7 @@ const anthropic = process.env.ANTHROPIC_API_KEY
   : null;
 
 // Fallback prompts when API is not available
-function getFallbackPrompts(title: string, style: string): PromptSuggestion[] {
+function getFallbackPrompts(title: string, style: string, platform: string): PromptSuggestion[] {
   const styleDescriptions: Record<string, string> = {
     modern: 'clean corporate design with subtle gradients',
     minimal: 'minimalist with white space and simple shapes',
@@ -33,17 +33,23 @@ function getFallbackPrompts(title: string, style: string): PromptSuggestion[] {
 
   const styleDesc = styleDescriptions[style] || styleDescriptions.modern;
 
+  // Add center-focused composition for blog platforms (Medium crops edges)
+  const isBlog = platform === 'blog' || platform === 'blog_hd';
+  const compositionNote = isBlog
+    ? 'Center-focused composition with main subject in middle third, safe for edge cropping.'
+    : 'centered composition';
+
   return [
     {
-      prompt: `Professional social media graphic: "${title}". ${styleDesc}, centered composition, business suitable.`,
+      prompt: `Professional social media graphic: "${title}". ${styleDesc}, ${compositionNote}, business suitable.`,
       description: 'Standard professional style',
     },
     {
-      prompt: `Abstract conceptual image representing "${title}". ${styleDesc}, symbolic imagery, thought-provoking visual metaphor.`,
+      prompt: `Abstract conceptual image representing "${title}". ${styleDesc}, symbolic imagery centered in frame, thought-provoking visual metaphor. ${isBlog ? compositionNote : ''}`,
       description: 'Abstract conceptual approach',
     },
     {
-      prompt: `Dynamic editorial illustration for "${title}". ${styleDesc}, editorial style, magazine quality, engaging visual.`,
+      prompt: `Dynamic editorial illustration for "${title}". ${styleDesc}, editorial style, magazine quality, ${compositionNote}, engaging visual.`,
       description: 'Editorial magazine style',
     },
   ];
@@ -63,12 +69,17 @@ export async function POST(request: NextRequest) {
     // If no API key, return fallback suggestions
     if (!anthropic) {
       return NextResponse.json({
-        suggestions: getFallbackPrompts(body.title, body.style),
+        suggestions: getFallbackPrompts(body.title, body.style, body.platform),
         source: 'fallback',
       });
     }
 
     // Use Claude to generate contextual prompts
+    const isBlogPlatform = body.platform === 'blog' || body.platform === 'blog_hd';
+    const compositionGuide = isBlogPlatform
+      ? `\n\nIMPORTANT: For blog images, always use CENTER-FOCUSED COMPOSITION with the main subject in the middle third of the frame. Blog platforms like Medium crop images from the edges, so keep important elements away from borders.`
+      : '';
+
     const systemPrompt = `You are an expert at creating image generation prompts for social media graphics.
 Given an article title and optional content, generate 3 distinct image prompt suggestions.
 Each prompt should be detailed, vivid, and optimized for AI image generation.
@@ -79,7 +90,7 @@ Style guidelines:
 - minimal: lots of white space, simple geometric shapes, elegant
 - bold: high contrast, vibrant colors, impactful, eye-catching
 - gradient: smooth color transitions, modern aesthetic, flowing
-- photo: photorealistic, professional lighting, sharp focus
+- photo: photorealistic, professional lighting, sharp focus${compositionGuide}
 
 Return a JSON array with exactly 3 objects, each having:
 - "prompt": the detailed image generation prompt (50-100 words)
@@ -113,7 +124,7 @@ Generate 3 distinct image prompt suggestions that would work well as the header/
     if (!jsonMatch) {
       // Fallback if JSON parsing fails
       return NextResponse.json({
-        suggestions: getFallbackPrompts(body.title, body.style),
+        suggestions: getFallbackPrompts(body.title, body.style, body.platform),
         source: 'fallback',
       });
     }
@@ -128,9 +139,9 @@ Generate 3 distinct image prompt suggestions that would work well as the header/
     console.error('Prompt suggestion error:', error);
 
     // Return fallback on any error
-    const body = await request.clone().json().catch(() => ({ title: '', style: 'modern' }));
+    const body = await request.clone().json().catch(() => ({ title: '', style: 'modern', platform: 'blog' }));
     return NextResponse.json({
-      suggestions: getFallbackPrompts(body.title || 'Article', body.style || 'modern'),
+      suggestions: getFallbackPrompts(body.title || 'Article', body.style || 'modern', body.platform || 'blog'),
       source: 'fallback',
       error: error instanceof Error ? error.message : 'Generation failed',
     });
