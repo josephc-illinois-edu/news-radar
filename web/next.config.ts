@@ -7,6 +7,19 @@ const nextConfig: NextConfig = {
     // Set root to parent to allow importing CLI scrapers from ../src
     root: path.resolve(__dirname, '..'),
   },
+  // Configure allowed image domains
+  images: {
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 'images.unsplash.com',
+      },
+      {
+        protocol: 'https',
+        hostname: '*.supabase.co',
+      },
+    ],
+  },
 };
 
 export default nextConfig;

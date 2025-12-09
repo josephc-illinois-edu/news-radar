@@ -61,7 +61,9 @@ export function FeaturedImageGenerator({
   onImageSaved,
   hidePlatformSelector = false,
 }: FeaturedImageGeneratorProps) {
-  const [platform, setPlatform] = useState<ImagePlatform>(initialPlatform);
+  // Validate initial platform - default to facebook if invalid
+  const validInitialPlatform = initialPlatform in PLATFORM_CONFIGS ? initialPlatform : 'facebook';
+  const [platform, setPlatform] = useState<ImagePlatform>(validInitialPlatform);
   const [style, setStyle] = useState<ImageStyle>(initialStyle);
   const [quality, setQuality] = useState<ImageQuality>('preview');
   const [generateMode, setGenerateMode] = useState<GenerateMode>('ai');

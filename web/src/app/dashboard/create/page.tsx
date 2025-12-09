@@ -35,6 +35,18 @@ import {
 } from '@/hooks/use-synthesis';
 import type { SuggestedAngle, SynthesisResult, ResearchContext } from '@/types/synthesis';
 import type { EditorialPosition } from '@/types/database';
+import { AVAILABLE_SOURCES, type StoryResult, type ScanResult } from '@/types/research';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
+import { Checkbox } from '@/components/ui/checkbox';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Search, Loader2, ExternalLink, Check } from 'lucide-react';
 
 const DEFAULT_TONE: ToneSettings = {
   humor: 3,
@@ -74,9 +86,13 @@ function CreatePageContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
 
-  // Mode detection
+  // Mode detection - check URL param first, then check if research context exists
   const mode = searchParams.get('mode');
-  const isSynthesisMode = mode === 'synthesis';
+  const { data: researchContext, clearContext, hasContext } = useResearchContext();
+
+  // Auto-detect synthesis mode: URL param OR research context exists
+  const isSynthesisMode = mode === 'synthesis' || (hasContext && researchContext?.context?.stories);
+  const hasResearchContext = hasContext && researchContext?.context?.stories;
 
   // Form state
   const [urls, setUrls] = useState<string>(searchParams.get('url') || searchParams.get('urls') || '');
@@ -92,10 +108,10 @@ function CreatePageContent() {
   const [editorialNotes, setEditorialNotes] = useState('');
 
   // Synthesis state
-  const { data: researchContext, clearContext } = useResearchContext();
   const synthesizeMutation = useSynthesizeResearch();
   const [synthesis, setSynthesis] = useState<SynthesisResult | null>(null);
   const [selectedAngle, setSelectedAngle] = useState<SuggestedAngle | null>(null);
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
 
   // Generation state
   const [isGenerating, setIsGenerating] = useState(false);
@@ -112,6 +128,16 @@ function CreatePageContent() {
       );
     }
   }, [isSynthesisMode, researchContext]);
+
+  // Handle clearing context with confirmation
+  const handleClearContext = () => {
+    clearContext();
+    setSynthesis(null);
+    setSelectedAngle(null);
+    setShowClearConfirm(false);
+    // Stay on the same page but in standard mode
+    router.replace('/dashboard/create');
+  };
 
   // Update URL from search params
   useEffect(() => {
@@ -390,9 +416,9 @@ function CreatePageContent() {
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="space-y-2">
-                    <Label>Platform</Label>
+                    <Label htmlFor="synth-platform">Platform</Label>
                     <Select value={platform} onValueChange={(v) => setPlatform(v as any)}>
-                      <SelectTrigger>
+                      <SelectTrigger id="synth-platform">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -405,9 +431,9 @@ function CreatePageContent() {
                     </Select>
                   </div>
                   <div className="space-y-2">
-                    <Label>Length</Label>
+                    <Label htmlFor="synth-length">Length</Label>
                     <Select value={length} onValueChange={(v) => setLength(v as any)}>
-                      <SelectTrigger>
+                      <SelectTrigger id="synth-length">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -429,9 +455,9 @@ function CreatePageContent() {
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="space-y-2">
-                    <Label>Position / Bias</Label>
+                    <Label htmlFor="synth-position">Position / Bias</Label>
                     <Select value={editorialPosition} onValueChange={(v) => setEditorialPosition(v as EditorialPosition)}>
-                      <SelectTrigger>
+                      <SelectTrigger id="synth-position">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -445,8 +471,9 @@ function CreatePageContent() {
                     </Select>
                   </div>
                   <div className="space-y-2">
-                    <Label>Editorial Notes</Label>
+                    <Label htmlFor="synth-notes">Editorial Notes</Label>
                     <Textarea
+                      id="synth-notes"
                       value={editorialNotes}
                       onChange={(e) => setEditorialNotes(e.target.value)}
                       placeholder="Add editorial guidelines or context..."
@@ -465,16 +492,31 @@ function CreatePageContent() {
                 {isGenerating ? 'Generating...' : 'Generate Article'}
               </Button>
 
-              <Button
-                variant="ghost"
-                className="w-full"
-                onClick={() => {
-                  clearContext();
-                  router.push('/dashboard/create');
-                }}
-              >
-                Start Fresh
-              </Button>
+              {/* Clear context confirmation dialog */}
+              <Dialog open={showClearConfirm} onOpenChange={setShowClearConfirm}>
+                <DialogTrigger asChild>
+                  <Button variant="ghost" className="w-full">
+                    Start Fresh
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Clear research context?</DialogTitle>
+                    <DialogDescription>
+                      This will clear your selected articles and research notes.
+                      You&apos;ll need to select articles again from the Research module.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="flex justify-end gap-2 mt-4">
+                    <Button variant="outline" onClick={() => setShowClearConfirm(false)}>
+                      Cancel
+                    </Button>
+                    <Button variant="destructive" onClick={handleClearContext}>
+                      Clear &amp; Start Fresh
+                    </Button>
+                  </div>
+                </DialogContent>
+              </Dialog>
             </div>
 
             {/* Right: Preview/Results */}
@@ -638,8 +680,19 @@ function CreatePageContent() {
           {/* Source URLs */}
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">Source URLs</CardTitle>
-              <CardDescription>Enter URLs to generate content from</CardDescription>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="text-base">Source Articles</CardTitle>
+                  <CardDescription>Enter article URLs or scan for recent stories</CardDescription>
+                </div>
+                <QuickScanDialog
+                  existingUrls={urls}
+                  onSelectArticles={(articles) => {
+                    const newUrls = articles.map(a => a.url).join('\n');
+                    setUrls(prev => prev ? `${prev}\n${newUrls}` : newUrls);
+                  }}
+                />
+              </div>
             </CardHeader>
             <CardContent>
               <Textarea
@@ -659,9 +712,9 @@ function CreatePageContent() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
-                <Label>Platform</Label>
+                <Label htmlFor="std-platform">Platform</Label>
                 <Select value={platform} onValueChange={(v) => setPlatform(v as any)}>
-                  <SelectTrigger>
+                  <SelectTrigger id="std-platform">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -675,9 +728,9 @@ function CreatePageContent() {
               </div>
 
               <div className="space-y-2">
-                <Label>Length</Label>
+                <Label htmlFor="std-length">Length</Label>
                 <Select value={length} onValueChange={(v) => setLength(v as any)}>
-                  <SelectTrigger>
+                  <SelectTrigger id="std-length">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -691,9 +744,9 @@ function CreatePageContent() {
               </div>
 
               <div className="space-y-2">
-                <Label>Style</Label>
+                <Label htmlFor="std-style">Style</Label>
                 <Select value={style} onValueChange={(v) => setStyle(v as any)}>
-                  <SelectTrigger>
+                  <SelectTrigger id="std-style">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -707,9 +760,9 @@ function CreatePageContent() {
               </div>
 
               <div className="space-y-2">
-                <Label>Variations</Label>
+                <Label htmlFor="std-variations">Variations</Label>
                 <Select value={String(variations)} onValueChange={(v) => setVariations(Number(v))}>
-                  <SelectTrigger>
+                  <SelectTrigger id="std-variations">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -770,9 +823,9 @@ function CreatePageContent() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
-                <Label>Position / Bias</Label>
+                <Label htmlFor="std-position">Position / Bias</Label>
                 <Select value={editorialPosition} onValueChange={(v) => setEditorialPosition(v as EditorialPosition)}>
-                  <SelectTrigger>
+                  <SelectTrigger id="std-position">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -786,8 +839,9 @@ function CreatePageContent() {
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label>Editorial Notes</Label>
+                <Label htmlFor="std-notes">Editorial Notes</Label>
                 <Textarea
+                  id="std-notes"
                   value={editorialNotes}
                   onChange={(e) => setEditorialNotes(e.target.value)}
                   placeholder="Add editorial guidelines or context..."
@@ -1033,5 +1087,365 @@ function AngleCard({
         </div>
       </div>
     </button>
+  );
+}
+
+// Extended scan result with suggestions
+interface ExtendedScanResult extends ScanResult {
+  sourceResults?: Record<string, { found: number; matched: number }>;
+  suggestedSources?: string[];
+  keywords?: string[];
+}
+
+// Extract keywords from a URL or title
+function extractKeywordsFromText(text: string): string[] {
+  const stopWords = new Set([
+    'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for',
+    'of', 'with', 'by', 'from', 'says', 'after', 'over', 'how', 'why',
+    'what', 'when', 'where', 'who', 'which', 'that', 'this', 'these',
+    'http', 'https', 'www', 'com', 'org', 'net', 'html', 'htm',
+  ]);
+
+  return text
+    .toLowerCase()
+    .replace(/[^\w\s]/g, ' ')
+    .split(/\s+/)
+    .filter(word => word.length > 3 && !stopWords.has(word))
+    .slice(0, 5);
+}
+
+// Quick Scan Dialog - Scan sources and select articles
+function QuickScanDialog({
+  onSelectArticles,
+  existingUrls = '',
+}: {
+  onSelectArticles: (articles: StoryResult[]) => void;
+  existingUrls?: string;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [selectedSources, setSelectedSources] = useState<string[]>(['hackernews', 'guardian']);
+  const [isScanning, setIsScanning] = useState(false);
+  const [scanResults, setScanResults] = useState<StoryResult[]>([]);
+  const [selectedArticles, setSelectedArticles] = useState<Set<string>>(new Set());
+  const [error, setError] = useState<string | null>(null);
+  const [searchKeywords, setSearchKeywords] = useState<string[]>([]);
+  const [manualTopic, setManualTopic] = useState('');
+  const [suggestedSources, setSuggestedSources] = useState<string[]>([]);
+  const [sourceResults, setSourceResults] = useState<Record<string, { found: number; matched: number }>>({});
+
+  // Detect if we have existing context
+  const hasExistingUrl = existingUrls.trim().length > 0;
+
+  // Extract keywords from existing URLs when dialog opens
+  useEffect(() => {
+    if (isOpen && hasExistingUrl) {
+      const urls = existingUrls.split('\n').filter(u => u.trim());
+      const firstUrl = urls[0];
+      // Extract keywords from URL path and domain
+      const keywords = extractKeywordsFromText(firstUrl);
+      setSearchKeywords(keywords);
+    } else if (isOpen && !hasExistingUrl) {
+      setSearchKeywords([]);
+    }
+  }, [isOpen, existingUrls, hasExistingUrl]);
+
+  const toggleSource = (sourceId: string) => {
+    setSelectedSources(prev =>
+      prev.includes(sourceId)
+        ? prev.filter(s => s !== sourceId)
+        : [...prev, sourceId]
+    );
+  };
+
+  const handleScan = async () => {
+    if (selectedSources.length === 0) return;
+
+    setIsScanning(true);
+    setError(null);
+    setScanResults([]);
+    setSelectedArticles(new Set());
+    setSuggestedSources([]);
+
+    // Combine extracted keywords with manual topic
+    const keywords = manualTopic.trim()
+      ? [...searchKeywords, ...extractKeywordsFromText(manualTopic)]
+      : searchKeywords;
+
+    try {
+      const response = await fetch('/api/research/scan', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sources: selectedSources,
+          limit: 15,
+          hoursBack: 168, // 7 days
+          keywords: keywords.length > 0 ? keywords : undefined,
+          requireKeywordMatch: keywords.length > 0,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Scan failed');
+      }
+
+      const data: ExtendedScanResult = await response.json();
+      setScanResults(data.stories);
+      setSuggestedSources(data.suggestedSources || []);
+      setSourceResults(data.sourceResults || {});
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Scan failed');
+    } finally {
+      setIsScanning(false);
+    }
+  };
+
+  const toggleArticle = (articleId: string) => {
+    setSelectedArticles(prev => {
+      const next = new Set(prev);
+      if (next.has(articleId)) {
+        next.delete(articleId);
+      } else if (next.size < 5) {
+        next.add(articleId);
+      }
+      return next;
+    });
+  };
+
+  const handleConfirm = () => {
+    const articles = scanResults.filter(a => selectedArticles.has(a.id));
+    onSelectArticles(articles);
+    setIsOpen(false);
+    // Reset state
+    setScanResults([]);
+    setSelectedArticles(new Set());
+  };
+
+  const formatTimeAgo = (dateString: string) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffHours = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60));
+    if (diffHours < 1) return 'just now';
+    if (diffHours < 24) return `${diffHours}h ago`;
+    return `${Math.floor(diffHours / 24)}d ago`;
+  };
+
+  // Get source name from id
+  const getSourceName = (id: string) => {
+    return AVAILABLE_SOURCES.find(s => s.id === id)?.name || id;
+  };
+
+  return (
+    <Dialog open={isOpen} onOpenChange={setIsOpen}>
+      <DialogTrigger asChild>
+        <Button variant="outline" size="sm" className="gap-2">
+          <Search className="h-4 w-4" />
+          {hasExistingUrl ? 'Find Related' : 'Quick Scan'}
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col">
+        <DialogHeader>
+          <DialogTitle>
+            {hasExistingUrl ? 'Find Related Articles' : 'Scan for Articles'}
+          </DialogTitle>
+          <DialogDescription>
+            {hasExistingUrl
+              ? 'Search for articles related to your source'
+              : 'Enter a topic or select sources to scan for recent stories'}
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="flex-1 overflow-hidden flex flex-col gap-4">
+          {/* Topic Input */}
+          <div className="space-y-2">
+            <Label className="text-sm font-medium">
+              {hasExistingUrl ? 'Refine Search Topic' : 'Search Topic (optional)'}
+            </Label>
+            <Input
+              value={manualTopic}
+              onChange={(e) => setManualTopic(e.target.value)}
+              placeholder={hasExistingUrl ? 'Add keywords to refine...' : 'e.g., AI regulation, climate policy...'}
+            />
+            {searchKeywords.length > 0 && (
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-xs text-muted-foreground">Searching for:</span>
+                {searchKeywords.map((kw) => (
+                  <Badge key={kw} variant="secondary" className="text-xs">
+                    {kw}
+                  </Badge>
+                ))}
+                {manualTopic && extractKeywordsFromText(manualTopic).map((kw) => (
+                  <Badge key={`m-${kw}`} variant="outline" className="text-xs">
+                    {kw}
+                  </Badge>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Source Selection */}
+          <div className="space-y-2">
+            <Label className="text-sm font-medium">Sources to Search</Label>
+            <div className="flex flex-wrap gap-2">
+              {AVAILABLE_SOURCES.map((source) => (
+                <Button
+                  key={source.id}
+                  variant={selectedSources.includes(source.id) ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => toggleSource(source.id)}
+                  className="gap-1"
+                >
+                  <span>{source.icon}</span>
+                  <span>{source.name}</span>
+                </Button>
+              ))}
+            </div>
+          </div>
+
+          {/* Scan Button */}
+          <Button
+            onClick={handleScan}
+            disabled={isScanning || selectedSources.length === 0}
+            className="w-full"
+          >
+            {isScanning ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Searching {selectedSources.length} source{selectedSources.length > 1 ? 's' : ''}...
+              </>
+            ) : (
+              <>
+                <Search className="mr-2 h-4 w-4" />
+                {searchKeywords.length > 0 || manualTopic ? 'Search for Related Articles' : 'Scan Recent Articles'}
+              </>
+            )}
+          </Button>
+
+          {error && (
+            <p className="text-sm text-destructive">{error}</p>
+          )}
+
+          {/* No Results Feedback */}
+          {!isScanning && scanResults.length === 0 && Object.keys(sourceResults).length > 0 && (
+            <Card className="border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/20">
+              <CardContent className="pt-4">
+                <p className="text-sm font-medium text-amber-800 dark:text-amber-200">
+                  No related articles found in the last 7 days
+                </p>
+                <p className="text-xs text-amber-700 dark:text-amber-300 mt-1">
+                  {Object.entries(sourceResults).map(([source, r]) =>
+                    `${getSourceName(source)}: ${r.found} articles scanned, ${r.matched} matched`
+                  ).join(' • ')}
+                </p>
+                {suggestedSources.length > 0 && (
+                  <div className="mt-3">
+                    <p className="text-xs text-amber-700 dark:text-amber-300 mb-2">
+                      Try these sources instead:
+                    </p>
+                    <div className="flex flex-wrap gap-1">
+                      {suggestedSources.slice(0, 4).map((sourceId) => (
+                        <Button
+                          key={sourceId}
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setSelectedSources(prev => [...prev, sourceId]);
+                          }}
+                          className="h-7 text-xs"
+                        >
+                          + {getSourceName(sourceId)}
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                <div className="mt-3 pt-3 border-t border-amber-200 dark:border-amber-800">
+                  <p className="text-xs text-amber-700 dark:text-amber-300">
+                    Try broadening your search or using different keywords
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Results */}
+          {scanResults.length > 0 && (
+            <div className="flex-1 overflow-hidden flex flex-col">
+              <div className="flex items-center justify-between mb-2">
+                <Label className="text-sm font-medium">
+                  Found {scanResults.length} articles
+                </Label>
+                <span className="text-xs text-muted-foreground">
+                  {selectedArticles.size}/5 selected
+                </span>
+              </div>
+              <ScrollArea className="flex-1 border rounded-md">
+                <div className="p-2 space-y-1">
+                  {scanResults.map((article) => (
+                    <button
+                      key={article.id}
+                      onClick={() => toggleArticle(article.id)}
+                      className={`w-full text-left p-3 rounded-md transition-colors ${
+                        selectedArticles.has(article.id)
+                          ? 'bg-primary/10 border border-primary'
+                          : 'hover:bg-accent border border-transparent'
+                      }`}
+                    >
+                      <div className="flex items-start gap-3">
+                        <div className={`mt-0.5 flex-shrink-0 w-5 h-5 rounded border flex items-center justify-center ${
+                          selectedArticles.has(article.id)
+                            ? 'bg-primary border-primary text-primary-foreground'
+                            : 'border-muted-foreground/30'
+                        }`}>
+                          {selectedArticles.has(article.id) && (
+                            <Check className="h-3 w-3" />
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-sm line-clamp-2">{article.title}</p>
+                          <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
+                            <Badge variant="outline" className="text-xs">
+                              {article.sourceName}
+                            </Badge>
+                            <span>{formatTimeAgo(article.publishedAt)}</span>
+                            {article.score > 0 && (
+                              <span>{article.score} pts</span>
+                            )}
+                          </div>
+                        </div>
+                        <a
+                          href={article.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={(e) => e.stopPropagation()}
+                          className="text-muted-foreground hover:text-foreground"
+                          aria-label="Open article in new tab"
+                        >
+                          <ExternalLink className="h-4 w-4" />
+                        </a>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </ScrollArea>
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        {scanResults.length > 0 && (
+          <div className="flex justify-end gap-2 pt-4 border-t">
+            <Button variant="outline" onClick={() => setIsOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleConfirm}
+              disabled={selectedArticles.size === 0}
+            >
+              Add {selectedArticles.size} Article{selectedArticles.size !== 1 ? 's' : ''}
+            </Button>
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
   );
 }

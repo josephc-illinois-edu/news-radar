@@ -10,7 +10,17 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { OriginalityChecker } from '@/components/articles/originality-checker';
 import { PLATFORM_CONFIGS, IMAGE_STYLES, type GeneratedImage } from '@/types/graphics';
+import type { OriginalityResult } from '@/types/originality';
 
 export default function ArticleDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -22,6 +32,10 @@ export default function ArticleDetailPage({ params }: { params: Promise<{ id: st
   const deleteArticle = useDeleteArticle();
   const publishArticle = usePublishArticle();
 
+  // Pre-publish originality check state
+  const [showPublishDialog, setShowPublishDialog] = useState(false);
+  const [originalityResult, setOriginalityResult] = useState<OriginalityResult | null>(null);
+
   const handleDelete = async () => {
     if (confirm('Are you sure you want to delete this article?')) {
       await deleteArticle.mutateAsync(id);
@@ -29,8 +43,14 @@ export default function ArticleDetailPage({ params }: { params: Promise<{ id: st
     }
   };
 
-  const handlePublish = async () => {
+  const handlePublishClick = () => {
+    // Show originality check dialog before publishing
+    setShowPublishDialog(true);
+  };
+
+  const handlePublishConfirm = async () => {
     await publishArticle.mutateAsync(id);
+    setShowPublishDialog(false);
   };
 
   if (isLoading) {
@@ -81,7 +101,7 @@ export default function ArticleDetailPage({ params }: { params: Promise<{ id: st
         </div>
         <div className="flex gap-2">
           {article.status === 'draft' && (
-            <Button onClick={handlePublish} disabled={publishArticle.isPending}>
+            <Button onClick={handlePublishClick} disabled={publishArticle.isPending}>
               {publishArticle.isPending ? 'Publishing...' : 'Publish'}
             </Button>
           )}
@@ -362,6 +382,58 @@ export default function ArticleDetailPage({ params }: { params: Promise<{ id: st
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Pre-publish Originality Check Dialog */}
+      <Dialog open={showPublishDialog} onOpenChange={setShowPublishDialog}>
+        <DialogContent
+          className="max-w-lg max-h-[90vh] overflow-y-auto"
+          aria-labelledby="publish-dialog-title"
+          aria-describedby="publish-dialog-description"
+        >
+          <DialogHeader>
+            <DialogTitle id="publish-dialog-title">Ready to Publish?</DialogTitle>
+            <DialogDescription id="publish-dialog-description">
+              Check your content for originality and template patterns before publishing.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="py-4">
+            <OriginalityChecker
+              content={article.content}
+              title={article.title}
+              onCheck={(result) => setOriginalityResult(result)}
+            />
+          </div>
+
+          <DialogFooter className="flex-col sm:flex-row gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setShowPublishDialog(false)}
+              className="w-full sm:w-auto"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handlePublishConfirm}
+              disabled={publishArticle.isPending}
+              className="w-full sm:w-auto"
+              variant={originalityResult && originalityResult.overallScore < 60 ? 'destructive' : 'default'}
+            >
+              {publishArticle.isPending
+                ? 'Publishing...'
+                : originalityResult && originalityResult.overallScore < 60
+                ? 'Publish Anyway'
+                : 'Publish'}
+            </Button>
+          </DialogFooter>
+
+          {originalityResult && originalityResult.overallScore < 60 && (
+            <p className="text-sm text-amber-600 dark:text-amber-400 text-center mt-2">
+              Score is below 60. Consider editing before publishing.
+            </p>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

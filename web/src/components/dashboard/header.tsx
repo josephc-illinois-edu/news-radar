@@ -23,8 +23,15 @@ export function Header() {
         <div className="flex items-center gap-x-4">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="relative h-8 w-8 rounded-full">
-                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-primary-foreground">
+              <Button
+                variant="ghost"
+                className="relative h-8 w-8 rounded-full"
+                aria-label="User menu"
+              >
+                <div
+                  className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-primary-foreground"
+                  aria-hidden="true"
+                >
                   {user?.email?.[0]?.toUpperCase() || 'U'}
                 </div>
               </Button>

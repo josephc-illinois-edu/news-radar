@@ -3,7 +3,8 @@
 import { use, useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useArticle, useUpdateArticle } from '@/hooks/use-articles';
+import { useArticle, useUpdateArticle, articleKeys } from '@/hooks/use-articles';
+import { useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -25,7 +26,8 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { FeaturedImageGenerator } from '@/components/articles/featured-image-generator';
-import type { ImagePlatform, ImageStyle } from '@/types/graphics';
+import { OriginalityChecker } from '@/components/articles/originality-checker';
+import { PLATFORM_CONFIGS, type ImagePlatform, type ImageStyle } from '@/types/graphics';
 import type { EditorialPosition, RewriteModel, RewriteResponse } from '@/types/database';
 import { Slider } from '@/components/ui/slider';
 import { Loader2, Sparkles, ChevronDown, ChevronUp } from 'lucide-react';
@@ -33,6 +35,7 @@ import { Loader2, Sparkles, ChevronDown, ChevronUp } from 'lucide-react';
 export default function ArticleEditPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const router = useRouter();
+  const queryClient = useQueryClient();
 
   const { data: article, isLoading, error } = useArticle(id);
   const updateArticle = useUpdateArticle();
@@ -68,25 +71,29 @@ export default function ArticleEditPage({ params }: { params: Promise<{ id: stri
     if (article) {
       setTitle(article.title);
       setContent(article.content);
-      // Use featured_image_platform as primary, fallback to article platform
-      setPlatform((article.featured_image_platform || article.platform || 'facebook') as ImagePlatform);
+      // Use featured_image_platform as primary, fallback to article platform - validate against known configs
+      const rawPlatform = article.featured_image_platform || article.platform || 'facebook';
+      const validPlatform = rawPlatform in PLATFORM_CONFIGS ? rawPlatform : 'facebook';
+      setPlatform(validPlatform as ImagePlatform);
       setStatus(article.status);
       setHashtags(article.hashtags?.join(', ') || '');
       setImageStyle(article.featured_image_style || 'modern');
       // Editorial controls
       setEditorialPosition(article.editorial_position || 'neutral');
       setEditorialNotes(article.editorial_notes || '');
-      setToneHumor(article.tone_humor ?? 50);
-      setToneUrgency(article.tone_urgency ?? 50);
-      setToneCriticism(article.tone_criticism ?? 50);
-      setToneOptimism(article.tone_optimism ?? 50);
+      // Scale DB values (0-10) to UI values (0-100)
+      setToneHumor((article.tone_humor ?? 5) * 10);
+      setToneUrgency((article.tone_urgency ?? 5) * 10);
+      setToneCriticism((article.tone_criticism ?? 5) * 10);
+      setToneOptimism((article.tone_optimism ?? 5) * 10);
     }
   }, [article]);
 
   // Track changes
   useEffect(() => {
     if (article) {
-      const currentPlatform = (article.featured_image_platform || article.platform || 'facebook') as ImagePlatform;
+      const rawPlatform = article.featured_image_platform || article.platform || 'facebook';
+      const currentPlatform = (rawPlatform in PLATFORM_CONFIGS ? rawPlatform : 'facebook') as ImagePlatform;
       const hasChanges =
         title !== article.title ||
         content !== article.content ||
@@ -96,10 +103,10 @@ export default function ArticleEditPage({ params }: { params: Promise<{ id: stri
         imageStyle !== (article.featured_image_style || 'modern') ||
         editorialPosition !== (article.editorial_position || 'neutral') ||
         editorialNotes !== (article.editorial_notes || '') ||
-        toneHumor !== (article.tone_humor ?? 50) ||
-        toneUrgency !== (article.tone_urgency ?? 50) ||
-        toneCriticism !== (article.tone_criticism ?? 50) ||
-        toneOptimism !== (article.tone_optimism ?? 50);
+        toneHumor !== (article.tone_humor ?? 5) * 10 ||
+        toneUrgency !== (article.tone_urgency ?? 5) * 10 ||
+        toneCriticism !== (article.tone_criticism ?? 5) * 10 ||
+        toneOptimism !== (article.tone_optimism ?? 5) * 10;
       setIsDirty(hasChanges);
     }
   }, [title, content, platform, status, hashtags, imageStyle, editorialPosition, editorialNotes, toneHumor, toneUrgency, toneCriticism, toneOptimism, article]);
@@ -133,10 +140,11 @@ export default function ArticleEditPage({ params }: { params: Promise<{ id: stri
       // Editorial controls
       editorial_position: editorialPosition,
       editorial_notes: editorialNotes || undefined,
-      tone_humor: toneHumor,
-      tone_urgency: toneUrgency,
-      tone_criticism: toneCriticism,
-      tone_optimism: toneOptimism,
+      // Scale UI values (0-100) to DB values (0-10)
+      tone_humor: Math.round(toneHumor / 10),
+      tone_urgency: Math.round(toneUrgency / 10),
+      tone_criticism: Math.round(toneCriticism / 10),
+      tone_optimism: Math.round(toneOptimism / 10),
     });
 
     setIsDirty(false);
@@ -199,6 +207,12 @@ export default function ArticleEditPage({ params }: { params: Promise<{ id: stri
     // Platform is unified - when image generator changes platform, update the main platform
     setPlatform(newPlatform);
     setImageStyle(newStyle);
+  };
+
+  // Handle image saved - invalidate cache so the article re-fetches with updated image
+  const handleImageSaved = (imageUrl: string, imageId: string) => {
+    // Invalidate article cache to refetch with new featured_image_url
+    queryClient.invalidateQueries({ queryKey: articleKeys.detail(id) });
   };
 
   if (isLoading) {
@@ -502,6 +516,7 @@ export default function ArticleEditPage({ params }: { params: Promise<{ id: stri
                 articleId={id}
                 existingImageUrl={article.featured_image_url}
                 hidePlatformSelector={true}
+                onImageSaved={handleImageSaved}
               />
             </CardContent>
           </Card>
@@ -590,6 +605,12 @@ export default function ArticleEditPage({ params }: { params: Promise<{ id: stri
               </div>
             </CardContent>
           </Card>
+
+          {/* Originality Checker */}
+          <OriginalityChecker
+            content={content}
+            title={title}
+          />
         </div>
       </div>
 
@@ -615,6 +636,7 @@ export default function ArticleEditPage({ params }: { params: Promise<{ id: stri
               onSettingsChange={handleImageSettingsChange}
               articleId={id}
               hidePlatformSelector={true}
+              onImageSaved={handleImageSaved}
             />
           </div>
           <DialogFooter className="flex-col sm:flex-row gap-2">

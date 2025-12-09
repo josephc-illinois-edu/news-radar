@@ -7,7 +7,12 @@
       "Bash(cat:*)",
       "Bash(npx tsc:*)",
       "Bash(grep:*)",
-      "WebSearch"
+      "WebSearch",
+      "Bash(npx shadcn@latest add:*)",
+      "Bash(timeout 90 npx tsc:*)",
+      "Bash(node -e:*)",
+      "Bash(PORT=3005 npm run build:*)",
+      "Bash(find:*)"
     ],
     "deny": [],
     "ask": []

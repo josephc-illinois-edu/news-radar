@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -22,12 +23,21 @@ import {
   type PlatformConnection,
   type PublishResult,
 } from '@/types/publish';
+import { AlertCircle, Settings, ExternalLink, Calendar, Clock } from 'lucide-react';
 
 interface Article {
   id: string;
   title: string;
   content: string;
   status: string;
+}
+
+interface ScheduledPost {
+  id: string;
+  articleTitle: string;
+  platforms: PublishPlatform[];
+  scheduledAt: string;
+  status: 'pending' | 'published' | 'failed';
 }
 
 export default function PublishPage() {
@@ -45,6 +55,11 @@ export default function PublishPage() {
   const [isPublishing, setIsPublishing] = useState(false);
   const [results, setResults] = useState<PublishResult[]>([]);
   const [error, setError] = useState<string | null>(null);
+
+  // Scheduled posts queue (demo data for now)
+  const [scheduledPosts, setScheduledPosts] = useState<ScheduledPost[]>([
+    // Demo data - in real app, this would come from API
+  ]);
 
   // Load articles and connections
   useEffect(() => {
@@ -139,12 +154,55 @@ export default function PublishPage() {
 
   const selectedArticleData = articles.find(a => a.id === selectedArticle);
 
+  // Check if any platform is connected
+  const hasConnectedPlatforms = connections.some(c => c.connected);
+  const isDemoMode = !hasConnectedPlatforms;
+
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold">Publish</h1>
         <p className="text-muted-foreground">Distribute your content across platforms</p>
       </div>
+
+      {/* Demo Mode Banner */}
+      {isDemoMode && (
+        <Card className="border-amber-500/50 bg-amber-500/5">
+          <CardContent className="py-4">
+            <div className="flex items-start gap-3">
+              <AlertCircle className="h-5 w-5 text-amber-500 shrink-0 mt-0.5" />
+              <div className="flex-1 space-y-2">
+                <p className="text-sm font-medium">Demo Mode Active</p>
+                <p className="text-sm text-muted-foreground">
+                  Publishing is currently in demo mode. To publish to real platforms, you need to:
+                </p>
+                <ul className="text-sm text-muted-foreground list-disc list-inside space-y-1">
+                  <li>Configure platform API keys in your environment</li>
+                  <li>Connect each platform in Settings</li>
+                </ul>
+                <div className="flex gap-2 pt-2">
+                  <Button variant="outline" size="sm" asChild>
+                    <Link href="/dashboard/settings">
+                      <Settings className="h-4 w-4 mr-1" />
+                      Go to Settings
+                    </Link>
+                  </Button>
+                  <Button variant="ghost" size="sm" asChild>
+                    <a
+                      href="https://github.com/your-repo/news-radar#publishing"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      <ExternalLink className="h-4 w-4 mr-1" />
+                      View Docs
+                    </a>
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <div className="grid gap-6 lg:grid-cols-3">
         {/* Left: Configuration */}
@@ -212,10 +270,11 @@ export default function PublishPage() {
                   </div>
                 );
               })}
-              <p className="text-xs text-muted-foreground mt-2">
-                Connect platforms in Settings to enable publishing.
-                For demo purposes, all platforms show as not connected.
-              </p>
+              {isDemoMode && (
+                <p className="text-xs text-muted-foreground mt-2">
+                  Connect platforms in Settings to enable publishing.
+                </p>
+              )}
             </CardContent>
           </Card>
 
@@ -339,6 +398,88 @@ export default function PublishPage() {
               </CardContent>
             </Card>
           )}
+
+          {/* Scheduled Posts Queue */}
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Calendar className="h-5 w-5 text-muted-foreground" aria-hidden="true" />
+                  <CardTitle className="text-base">Scheduled Posts</CardTitle>
+                </div>
+                <Badge variant="outline">{scheduledPosts.length} queued</Badge>
+              </div>
+              <CardDescription>Upcoming publications in your queue</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {scheduledPosts.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  <Clock className="h-8 w-8 mx-auto mb-2 opacity-50" aria-hidden="true" />
+                  <p>No scheduled posts yet.</p>
+                  <p className="text-sm mt-1">
+                    Schedule a post to see it here.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {scheduledPosts
+                    .sort((a, b) => new Date(a.scheduledAt).getTime() - new Date(b.scheduledAt).getTime())
+                    .map((post) => {
+                      const scheduledDate = new Date(post.scheduledAt);
+                      const isPast = scheduledDate < new Date();
+
+                      return (
+                        <div
+                          key={post.id}
+                          className={`p-3 rounded-lg border ${
+                            post.status === 'published'
+                              ? 'bg-green-50 dark:bg-green-950 border-green-500/30'
+                              : post.status === 'failed'
+                              ? 'bg-red-50 dark:bg-red-950 border-red-500/30'
+                              : isPast
+                              ? 'bg-amber-50 dark:bg-amber-950 border-amber-500/30'
+                              : ''
+                          }`}
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0 flex-1">
+                              <p className="font-medium truncate">{post.articleTitle}</p>
+                              <div className="flex flex-wrap items-center gap-2 mt-1">
+                                {post.platforms.map((platform) => (
+                                  <Badge key={platform} variant="secondary" className="text-xs">
+                                    {PLATFORM_INFO[platform]?.name || platform}
+                                  </Badge>
+                                ))}
+                              </div>
+                            </div>
+                            <div className="text-right shrink-0">
+                              <p className="text-sm font-medium">
+                                {scheduledDate.toLocaleDateString()}
+                              </p>
+                              <p className="text-xs text-muted-foreground">
+                                {scheduledDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                              </p>
+                              <Badge
+                                variant={
+                                  post.status === 'published'
+                                    ? 'default'
+                                    : post.status === 'failed'
+                                    ? 'destructive'
+                                    : 'outline'
+                                }
+                                className="mt-1"
+                              >
+                                {post.status}
+                              </Badge>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                </div>
+              )}
+            </CardContent>
+          </Card>
 
           {/* Preview */}
           {selectedArticleData ? (

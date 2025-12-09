@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import Link from 'next/link';
 import { useScanSources, useArticleSelection } from '@/hooks/use-research';
 import { Button } from '@/components/ui/button';
@@ -8,11 +8,43 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '@/components/ui/collapsible';
+import { Search, Filter, ChevronDown } from 'lucide-react';
 import { AVAILABLE_SOURCES, type StoryResult, type SourceId } from '@/types/research';
+
+// Filter types
+interface ResultFilters {
+  keyword: string;
+  minEngagement: number;
+  sortBy: 'engagement' | 'date' | 'comments';
+  hoursBack: number;
+}
+
+const DEFAULT_FILTERS: ResultFilters = {
+  keyword: '',
+  minEngagement: 0,
+  sortBy: 'engagement',
+  hoursBack: 24,
+};
 
 export default function ResearchPage() {
   const [selectedSources, setSelectedSources] = useState<SourceId[]>(['hackernews']);
   const [results, setResults] = useState<StoryResult[]>([]);
+  const [filters, setFilters] = useState<ResultFilters>(DEFAULT_FILTERS);
+  const [showFilters, setShowFilters] = useState(false);
   const scanMutation = useScanSources();
   const {
     selected: selectedArticles,
@@ -35,12 +67,43 @@ export default function ResearchPage() {
 
     const result = await scanMutation.mutateAsync({
       sources: selectedSources,
-      limit: 20,
-      hoursBack: 24,
+      limit: 50, // Get more results, filter client-side
+      hoursBack: filters.hoursBack,
     });
 
     setResults(result.stories);
   };
+
+  // Filter and sort results
+  const filteredResults = useMemo(() => {
+    let filtered = [...results];
+
+    // Keyword filter
+    if (filters.keyword.trim()) {
+      const keyword = filters.keyword.toLowerCase();
+      filtered = filtered.filter(
+        (s) =>
+          s.title.toLowerCase().includes(keyword) ||
+          s.keywords?.some((k) => k.toLowerCase().includes(keyword))
+      );
+    }
+
+    // Minimum engagement filter
+    if (filters.minEngagement > 0) {
+      filtered = filtered.filter((s) => (s.score || 0) >= filters.minEngagement);
+    }
+
+    // Sort
+    if (filters.sortBy === 'engagement') {
+      filtered.sort((a, b) => (b.score || 0) - (a.score || 0));
+    } else if (filters.sortBy === 'date') {
+      filtered.sort((a, b) => new Date(b.publishedAt || 0).getTime() - new Date(a.publishedAt || 0).getTime());
+    } else if (filters.sortBy === 'comments') {
+      filtered.sort((a, b) => (b.commentCount || 0) - (a.commentCount || 0));
+    }
+
+    return filtered;
+  }, [results, filters]);
 
   const techSources = AVAILABLE_SOURCES.filter((s) => s.category === 'tech');
   const newsSources = AVAILABLE_SOURCES.filter((s) => s.category === 'news');
@@ -155,27 +218,138 @@ export default function ResearchPage() {
         </Card>
       )}
 
-      {/* Results */}
+      {/* Results with Filters */}
       {results.length > 0 && !scanMutation.isPending && (
         <div className="space-y-4">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <h2 className="text-xl font-semibold">
-              Results ({results.length} stories)
+              Results ({filteredResults.length} of {results.length} stories)
             </h2>
-            <p className="text-sm text-muted-foreground">
-              Sorted by engagement velocity • Click to select for comparison
-            </p>
+            <div className="flex items-center gap-2">
+              {/* Quick keyword search */}
+              <div className="relative">
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" aria-hidden="true" />
+                <Input
+                  id="keyword-search"
+                  placeholder="Filter by keyword..."
+                  value={filters.keyword}
+                  onChange={(e) => setFilters((f) => ({ ...f, keyword: e.target.value }))}
+                  className="pl-8 w-48"
+                  aria-label="Filter results by keyword"
+                />
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowFilters(!showFilters)}
+              >
+                <Filter className="h-4 w-4 mr-1" aria-hidden="true" />
+                Filters
+                <ChevronDown className={`h-4 w-4 ml-1 transition-transform ${showFilters ? 'rotate-180' : ''}`} aria-hidden="true" />
+              </Button>
+            </div>
           </div>
 
-          {results.map((story) => (
-            <StoryCard
-              key={story.id}
-              story={story}
-              isSelected={isSelected(story.id)}
-              onToggle={() => toggleSelection(story)}
-              canSelect={canAddMore || isSelected(story.id)}
-            />
-          ))}
+          {/* Advanced Filters */}
+          <Collapsible open={showFilters} onOpenChange={setShowFilters}>
+            <CollapsibleContent>
+              <Card className="bg-muted/30">
+                <CardContent className="pt-4">
+                  <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="filter-hours">Time Range</Label>
+                      <Select
+                        value={String(filters.hoursBack)}
+                        onValueChange={(v) => setFilters((f) => ({ ...f, hoursBack: Number(v) }))}
+                      >
+                        <SelectTrigger id="filter-hours">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="6">Last 6 hours</SelectItem>
+                          <SelectItem value="12">Last 12 hours</SelectItem>
+                          <SelectItem value="24">Last 24 hours</SelectItem>
+                          <SelectItem value="48">Last 48 hours</SelectItem>
+                          <SelectItem value="72">Last 72 hours</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="filter-engagement">Min. Engagement</Label>
+                      <Select
+                        value={String(filters.minEngagement)}
+                        onValueChange={(v) => setFilters((f) => ({ ...f, minEngagement: Number(v) }))}
+                      >
+                        <SelectTrigger id="filter-engagement">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="0">Any</SelectItem>
+                          <SelectItem value="10">10+ points</SelectItem>
+                          <SelectItem value="50">50+ points</SelectItem>
+                          <SelectItem value="100">100+ points</SelectItem>
+                          <SelectItem value="500">500+ points</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="filter-sort">Sort By</Label>
+                      <Select
+                        value={filters.sortBy}
+                        onValueChange={(v) => setFilters((f) => ({ ...f, sortBy: v as ResultFilters['sortBy'] }))}
+                      >
+                        <SelectTrigger id="filter-sort">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="engagement">Engagement</SelectItem>
+                          <SelectItem value="date">Most Recent</SelectItem>
+                          <SelectItem value="comments">Most Comments</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="flex items-end">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setFilters(DEFAULT_FILTERS)}
+                      >
+                        Reset Filters
+                      </Button>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </CollapsibleContent>
+          </Collapsible>
+
+          {/* Filtered Results */}
+          {filteredResults.length === 0 ? (
+            <Card>
+              <CardContent className="py-8 text-center">
+                <p className="text-muted-foreground">
+                  No stories match your filters. Try adjusting the criteria.
+                </p>
+                <Button
+                  variant="link"
+                  onClick={() => setFilters(DEFAULT_FILTERS)}
+                  className="mt-2"
+                >
+                  Reset filters
+                </Button>
+              </CardContent>
+            </Card>
+          ) : (
+            filteredResults.map((story) => (
+              <StoryCard
+                key={story.id}
+                story={story}
+                isSelected={isSelected(story.id)}
+                onToggle={() => toggleSelection(story)}
+                canSelect={canAddMore || isSelected(story.id)}
+              />
+            ))
+          )}
         </div>
       )}
 

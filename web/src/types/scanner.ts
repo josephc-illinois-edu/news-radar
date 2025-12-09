@@ -165,16 +165,8 @@ export interface ValidateFeedResponse {
   error?: string;
 }
 
-// === RSS Feed Presets ===
-
-export const RSS_PRESETS: Omit<RSSFeed, 'id' | 'userId' | 'createdAt'>[] = [
-  { name: 'BBC News', url: 'https://feeds.bbci.co.uk/news/rss.xml', category: 'news', enabled: true, errorCount: 0 },
-  { name: 'Reuters World', url: 'https://www.reutersagency.com/feed/', category: 'news', enabled: true, errorCount: 0 },
-  { name: 'TechCrunch', url: 'https://techcrunch.com/feed/', category: 'tech', enabled: true, errorCount: 0 },
-  { name: 'Ars Technica', url: 'https://feeds.arstechnica.com/arstechnica/technology-lab', category: 'tech', enabled: true, errorCount: 0 },
-  { name: 'The Verge', url: 'https://www.theverge.com/rss/index.xml', category: 'tech', enabled: true, errorCount: 0 },
-  { name: 'NPR News', url: 'https://feeds.npr.org/1001/rss.xml', category: 'news', enabled: true, errorCount: 0 },
-];
+// NOTE: RSS presets have been consolidated into SOURCE_LIBRARY in src/types/sources.ts
+// Use getSourcesByTier('quality') or getSourcesByCategory() to access them
 
 // === Trending Score Calculation ===
 

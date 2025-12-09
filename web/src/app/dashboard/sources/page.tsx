@@ -24,8 +24,14 @@ import {
   useCreateSource,
   useDeleteSource,
 } from '@/hooks/use-sources';
-import { RSS_PRESETS, type NewsSource, type SourceCategory } from '@/types/sources';
-import { Plus, Trash2, ExternalLink, AlertCircle, Rss, Globe, Settings2 } from 'lucide-react';
+import {
+  SOURCE_LIBRARY,
+  getSourcesByTier,
+  type NewsSource,
+  type SourceCategory,
+  type SourcePreset,
+} from '@/types/sources';
+import { Plus, Trash2, ExternalLink, AlertCircle, Rss, Globe, Settings2, Star, Sparkles } from 'lucide-react';
 
 export default function SourcesPage() {
   const { data, isLoading, error } = useSources();
@@ -129,16 +135,34 @@ export default function SourcesPage() {
         )}
       </div>
 
-      {/* Preset Suggestions */}
-      <div className="space-y-4">
-        <div className="flex items-center gap-2">
-          <Globe className="h-5 w-5 text-muted-foreground" />
-          <h2 className="text-lg font-semibold">Quick Add Presets</h2>
+      {/* Source Library */}
+      <div className="space-y-6">
+        {/* Premium Tier */}
+        <div className="space-y-3">
+          <div className="flex items-center gap-2">
+            <Star className="h-5 w-5 text-amber-500" />
+            <h2 className="text-lg font-semibold">Premium Sources</h2>
+            <Badge variant="secondary" className="text-xs">Real engagement data</Badge>
+          </div>
+          <div className="grid gap-2 sm:grid-cols-2">
+            {getSourcesByTier('premium').map((preset) => (
+              <PresetCard key={preset.slug} preset={preset} />
+            ))}
+          </div>
         </div>
-        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-          {RSS_PRESETS.map((preset) => (
-            <PresetCard key={preset.url} preset={preset} />
-          ))}
+
+        {/* Quality Tier */}
+        <div className="space-y-3">
+          <div className="flex items-center gap-2">
+            <Sparkles className="h-5 w-5 text-blue-500" />
+            <h2 className="text-lg font-semibold">Quality Sources</h2>
+            <Badge variant="outline" className="text-xs">Reliable RSS feeds</Badge>
+          </div>
+          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+            {getSourcesByTier('quality').map((preset) => (
+              <PresetCard key={preset.slug} preset={preset} />
+            ))}
+          </div>
         </div>
       </div>
     </div>
@@ -342,17 +366,22 @@ function AddSourceDialog({ onClose }: { onClose: () => void }) {
 
 // === Preset Card ===
 
-function PresetCard({ preset }: { preset: typeof RSS_PRESETS[number] }) {
+function PresetCard({ preset }: { preset: SourcePreset }) {
   const createSource = useCreateSource();
+  const { data } = useSources();
+
+  // Check if this source is already added
+  const isAdded = data?.sources.some(s => s.slug === preset.slug);
 
   const handleAdd = async () => {
     try {
       await createSource.mutateAsync({
         name: preset.name,
+        slug: preset.slug,
         icon: preset.icon,
         category: preset.category,
-        source_type: 'rss',
-        config: { url: preset.url },
+        source_type: preset.source_type,
+        config: preset.config,
       });
     } catch (err) {
       // May fail if already added
@@ -360,26 +389,36 @@ function PresetCard({ preset }: { preset: typeof RSS_PRESETS[number] }) {
   };
 
   return (
-    <Card>
+    <Card className={isAdded ? 'border-primary/50 bg-primary/5' : undefined}>
       <CardContent className="flex items-center justify-between py-3">
-        <div className="flex items-center gap-3">
-          <span className="text-xl">{preset.icon}</span>
-          <div>
-            <span className="font-medium">{preset.name}</span>
-            <Badge variant="outline" className="ml-2 text-xs">
-              {preset.category}
-            </Badge>
+        <div className="flex items-center gap-3 min-w-0">
+          <span className="text-xl flex-shrink-0">{preset.icon}</span>
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="font-medium">{preset.name}</span>
+              <Badge variant="outline" className="text-xs">
+                {preset.category}
+              </Badge>
+            </div>
+            <p className="text-xs text-muted-foreground truncate" title={preset.description}>
+              {preset.description}
+            </p>
           </div>
         </div>
-        <Button
-          size="sm"
-          variant="outline"
-          onClick={handleAdd}
-          disabled={createSource.isPending}
-        >
-          <Plus className="mr-1 h-3 w-3" />
-          Add
-        </Button>
+        {isAdded ? (
+          <Badge variant="secondary" className="flex-shrink-0">Added</Badge>
+        ) : (
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={handleAdd}
+            disabled={createSource.isPending}
+            className="flex-shrink-0"
+          >
+            <Plus className="mr-1 h-3 w-3" />
+            Add
+          </Button>
+        )}
       </CardContent>
     </Card>
   );
