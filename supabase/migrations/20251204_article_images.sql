@@ -35,7 +35,7 @@ CREATE TABLE IF NOT EXISTS article_images (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Add featured_image_url to articles table if not exists
+-- Add featured_image columns to articles table if not exists
 DO $$
 BEGIN
   IF NOT EXISTS (
@@ -50,6 +50,20 @@ BEGIN
     WHERE table_name = 'articles' AND column_name = 'featured_image_id'
   ) THEN
     ALTER TABLE articles ADD COLUMN featured_image_id UUID REFERENCES article_images(id) ON DELETE SET NULL;
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'articles' AND column_name = 'featured_image_platform'
+  ) THEN
+    ALTER TABLE articles ADD COLUMN featured_image_platform TEXT;
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'articles' AND column_name = 'featured_image_style'
+  ) THEN
+    ALTER TABLE articles ADD COLUMN featured_image_style TEXT;
   END IF;
 END $$;
 

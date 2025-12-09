@@ -34,6 +34,8 @@ What do you think about the future of AI in creative work? Share your thoughts i
   hashtags: ['#AI', '#ContentCreation', '#FutureOfWork'],
   featured_image_platform: 'linkedin',
   featured_image_style: 'modern',
+  featured_image_url: undefined,
+  featured_image_id: undefined,
   view_count: 42,
   created_at: new Date().toISOString(),
   updated_at: new Date().toISOString(),

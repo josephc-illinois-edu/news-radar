@@ -15,6 +15,9 @@ export interface DBUser {
   updated_at: string;
 }
 
+// Editorial position on political/ideological spectrum
+export type EditorialPosition = 'left' | 'center-left' | 'center' | 'center-right' | 'right' | 'neutral';
+
 export interface DBArticle {
   id: string;
   user_id?: string;
@@ -23,20 +26,45 @@ export interface DBArticle {
   excerpt?: string;
   word_count?: number;
   reading_time_minutes?: number;
-  platform?: 'facebook' | 'linkedin' | 'newsletter' | 'blog';
+  platform?: ImagePlatform;
   length?: 'tweet' | 'short' | 'medium' | 'long';
   style?: 'conversational' | 'academic';
   tone_humor?: number;
   tone_urgency?: number;
   tone_optimism?: number;
   tone_criticism?: number;
+  // Editorial controls
+  editorial_position?: EditorialPosition;
+  editorial_notes?: string;
   status: 'draft' | 'published' | 'archived';
   published_at?: string;
   keywords?: string[];
   hashtags?: string[];
   featured_image_platform?: ImagePlatform;
   featured_image_style?: ImageStyle;
+  featured_image_url?: string;
+  featured_image_id?: string;
   view_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface DBArticleImage {
+  id: string;
+  article_id?: string;
+  user_id?: string;
+  title: string;
+  filename: string;
+  storage_path: string;
+  public_url?: string;
+  platform: ImagePlatform;
+  style: ImageStyle;
+  generation_mode: 'dalle' | 'ai' | 'placeholder';
+  prompt?: string;
+  width: number;
+  height: number;
+  cost?: number;
+  is_featured: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -96,18 +124,43 @@ export interface CreateArticleInput {
   excerpt?: string;
   word_count?: number;
   reading_time_minutes?: number;
-  platform?: 'facebook' | 'linkedin' | 'newsletter' | 'blog';
+  platform?: ImagePlatform;
   length?: 'tweet' | 'short' | 'medium' | 'long';
   style?: 'conversational' | 'academic';
   tone_humor?: number;
   tone_urgency?: number;
   tone_optimism?: number;
   tone_criticism?: number;
+  editorial_position?: EditorialPosition;
+  editorial_notes?: string;
   keywords?: string[];
   hashtags?: string[];
   featured_image_platform?: ImagePlatform;
   featured_image_style?: ImageStyle;
   status?: 'draft' | 'published' | 'archived';
+}
+
+// Rewrite API types
+export type RewriteModel = 'haiku' | 'sonnet';
+
+export interface RewriteRequest {
+  content: string;
+  instruction: string;
+  model?: RewriteModel;
+  // Editorial context
+  editorial_position?: EditorialPosition;
+  editorial_notes?: string;
+  tone_humor?: number;
+  tone_urgency?: number;
+  tone_criticism?: number;
+  tone_optimism?: number;
+}
+
+export interface RewriteResponse {
+  rewritten: string;
+  model: RewriteModel;
+  tokens_used: number;
+  estimated_cost: number;
 }
 
 export interface UpdateArticleInput extends Partial<CreateArticleInput> {}

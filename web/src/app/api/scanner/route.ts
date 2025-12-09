@@ -12,9 +12,9 @@ import type {
   TrendingTopic,
   SourceStat,
   TopicCandidate,
-  calculateTrendingScore,
 } from '@/types/scanner';
-import { AVAILABLE_SOURCES } from '@/types/research';
+import { getEnabledSources, getSourceFeedUrls } from '@/lib/sources';
+import type { NewsSource } from '@/types/sources';
 
 // === Source Scanners (reused from research/scan) ===
 
@@ -86,61 +86,6 @@ async function scanLobsters(limit: number = 20): Promise<StoryResult[]> {
   });
 }
 
-async function scanGuardian(limit: number = 20): Promise<StoryResult[]> {
-  const response = await fetch('https://www.theguardian.com/world/rss');
-  if (!response.ok) throw new Error('Guardian RSS failed');
-
-  const text = await response.text();
-  const items = parseRSS(text, limit);
-
-  return items.map((item, i) => ({
-    id: `guardian-${i}-${Date.now()}`,
-    title: item.title,
-    url: item.link,
-    contentSnippet: item.description,
-    publishedAt: item.pubDate,
-    score: 0,
-    commentCount: 0,
-    engagementVelocity: 0,
-    keywords: extractKeywords(item.title),
-    topics: ['world', 'news'],
-    sourceId: 'guardian',
-    sourceName: 'The Guardian',
-    detectedAt: new Date().toISOString(),
-    status: 'flagged' as const,
-  }));
-}
-
-async function scanRSSFeed(feedUrl: string, limit: number = 20): Promise<StoryResult[]> {
-  try {
-    const response = await fetch(feedUrl);
-    if (!response.ok) throw new Error(`RSS fetch failed: ${response.status}`);
-
-    const text = await response.text();
-    const items = parseRSS(text, limit);
-    const feedName = extractFeedName(text) || new URL(feedUrl).hostname;
-
-    return items.map((item, i) => ({
-      id: `rss-${feedUrl.slice(0, 20)}-${i}-${Date.now()}`,
-      title: item.title,
-      url: item.link,
-      contentSnippet: item.description,
-      publishedAt: item.pubDate,
-      score: 0,
-      commentCount: 0,
-      engagementVelocity: 0,
-      keywords: extractKeywords(item.title),
-      topics: ['news'],
-      sourceId: `rss-${new URL(feedUrl).hostname}`,
-      sourceName: feedName,
-      detectedAt: new Date().toISOString(),
-      status: 'flagged' as const,
-    }));
-  } catch (error) {
-    console.error(`RSS scan failed for ${feedUrl}:`, error);
-    return [];
-  }
-}
 
 // === RSS Parsing ===
 
@@ -182,11 +127,6 @@ function cleanCDATA(text: string): string {
   return text.replace(/<!\[CDATA\[|\]\]>/g, '').trim();
 }
 
-function extractFeedName(xml: string): string {
-  const titleMatch = xml.match(/<channel>[\s\S]*?<title><!\[CDATA\[(.*?)\]\]><\/title>|<channel>[\s\S]*?<title>(.*?)<\/title>/);
-  return titleMatch ? (titleMatch[1] || titleMatch[2] || '').trim() : '';
-}
-
 function extractKeywords(title: string): string[] {
   const stopWords = new Set(['the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by', 'from', 'is', 'are', 'was', 'were', 'be', 'been', 'being', 'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'could', 'should', 'may', 'might', 'must', 'shall', 'can', 'need', 'dare', 'ought', 'used', 'this', 'that', 'these', 'those', 'it', 'its']);
   return title
@@ -199,7 +139,7 @@ function extractKeywords(title: string): string[] {
 
 // === Topic Extraction ===
 
-function extractTopics(stories: StoryResult[]): TrendingTopic[] {
+function extractTopics(stories: StoryResult[], totalSources: number = 3): TrendingTopic[] {
   const topicMap = new Map<string, TopicCandidate>();
 
   for (const story of stories) {
@@ -229,9 +169,6 @@ function extractTopics(stories: StoryResult[]): TrendingTopic[] {
       }
     }
   }
-
-  // Convert to TrendingTopic array, filter by minimum mentions
-  const totalSources = AVAILABLE_SOURCES.length;
 
   return Array.from(topicMap.values())
     .filter(t => t.mentionCount >= 2)
@@ -288,46 +225,48 @@ function calculateTrendingScoreInternal(
   };
 }
 
-// === Scan All Sources ===
+// === Scan Sources from DB ===
 
-async function scanAllSources(request: ScanRequest): Promise<ScanResponse> {
-  const {
-    sources = ['hackernews', 'lobsters', 'guardian'],
-    customFeeds = [],
-    hoursBack = 24,
-    limit = 20,
-  } = request;
+async function scanSourcesFromDB(request: ScanRequest): Promise<ScanResponse> {
+  const { hoursBack = 24, limit = 20 } = request;
+
+  // Get enabled sources from database
+  const enabledSources = await getEnabledSources();
 
   const allStories: StoryResult[] = [];
   const sourceStats: SourceStat[] = [];
   const errors: string[] = [];
 
-  // Scan built-in sources
-  for (const source of sources) {
-    const startTime = Date.now();
+  // Scan each enabled source
+  for (const source of enabledSources) {
     try {
       let stories: StoryResult[] = [];
 
-      switch (source) {
-        case 'hackernews':
-          stories = await scanHackerNews(limit, hoursBack);
-          break;
-        case 'lobsters':
-          stories = await scanLobsters(limit);
-          break;
-        case 'guardian':
-          stories = await scanGuardian(limit);
-          break;
-        default:
-          console.log(`Source ${source} not implemented`);
+      // Handle different source types
+      if (source.source_type === 'api') {
+        switch (source.slug) {
+          case 'hackernews':
+            stories = await scanHackerNews(limit, hoursBack);
+            break;
+          case 'lobsters':
+            stories = await scanLobsters(limit);
+            break;
+          default:
+            console.log(`API source ${source.slug} not implemented`);
+        }
+      } else if (source.source_type === 'rss') {
+        const feedUrls = getSourceFeedUrls(source);
+        for (const feedUrl of feedUrls) {
+          const feedStories = await scanRSSFeedWithMeta(feedUrl, source.slug, source.name, limit);
+          stories.push(...feedStories);
+        }
       }
 
       allStories.push(...stories);
 
-      const sourceName = AVAILABLE_SOURCES.find(s => s.id === source)?.name || source;
       sourceStats.push({
-        sourceId: source,
-        sourceName,
+        sourceId: source.slug,
+        sourceName: source.name,
         storiesFound: stories.length,
         avgEngagement: stories.reduce((sum, s) => sum + s.engagementVelocity, 0) / Math.max(stories.length, 1),
         lastSuccess: new Date().toISOString(),
@@ -335,12 +274,11 @@ async function scanAllSources(request: ScanRequest): Promise<ScanResponse> {
       });
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unknown error';
-      errors.push(`${source}: ${message}`);
+      errors.push(`${source.name}: ${message}`);
 
-      const sourceName = AVAILABLE_SOURCES.find(s => s.id === source)?.name || source;
       sourceStats.push({
-        sourceId: source,
-        sourceName,
+        sourceId: source.slug,
+        sourceName: source.name,
         storiesFound: 0,
         avgEngagement: 0,
         lastError: message,
@@ -349,32 +287,11 @@ async function scanAllSources(request: ScanRequest): Promise<ScanResponse> {
     }
   }
 
-  // Scan custom RSS feeds
-  for (const feedUrl of customFeeds) {
-    try {
-      const stories = await scanRSSFeed(feedUrl, limit);
-      allStories.push(...stories);
-
-      const hostname = new URL(feedUrl).hostname;
-      sourceStats.push({
-        sourceId: `rss-${hostname}`,
-        sourceName: hostname,
-        storiesFound: stories.length,
-        avgEngagement: 0,
-        lastSuccess: new Date().toISOString(),
-        errorCount: 0,
-      });
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Unknown error';
-      errors.push(`RSS ${feedUrl}: ${message}`);
-    }
-  }
-
   // Sort stories by engagement velocity
   allStories.sort((a, b) => b.engagementVelocity - a.engagementVelocity);
 
   // Extract trending topics
-  const topics = extractTopics(allStories);
+  const topics = extractTopics(allStories, enabledSources.length);
 
   return {
     stories: allStories,
@@ -386,10 +303,47 @@ async function scanAllSources(request: ScanRequest): Promise<ScanResponse> {
   };
 }
 
-// === Demo Data ===
+// RSS feed scanner with metadata
+async function scanRSSFeedWithMeta(
+  feedUrl: string,
+  sourceId: string,
+  sourceName: string,
+  limit: number = 20
+): Promise<StoryResult[]> {
+  try {
+    const response = await fetch(feedUrl);
+    if (!response.ok) throw new Error(`RSS fetch failed: ${response.status}`);
 
-function generateDemoDashboard(): ScannerDashboard {
+    const text = await response.text();
+    const items = parseRSS(text, limit);
+
+    return items.map((item, i) => ({
+      id: `${sourceId}-${i}-${Date.now()}`,
+      title: item.title,
+      url: item.link,
+      contentSnippet: item.description,
+      publishedAt: item.pubDate,
+      score: 0,
+      commentCount: 0,
+      engagementVelocity: 0,
+      keywords: extractKeywords(item.title),
+      topics: ['news'],
+      sourceId,
+      sourceName,
+      detectedAt: new Date().toISOString(),
+      status: 'flagged' as const,
+    }));
+  } catch (error) {
+    console.error(`RSS scan failed for ${feedUrl}:`, error);
+    return [];
+  }
+}
+
+// === Demo Dashboard (uses enabled sources from DB) ===
+
+async function generateDashboard(): Promise<ScannerDashboard> {
   const now = new Date();
+  const enabledSources = await getEnabledSources();
 
   return {
     lastScanTime: new Date(now.getTime() - 5 * 60 * 1000).toISOString(),
@@ -427,22 +381,6 @@ function generateDemoDashboard(): ScannerDashboard {
         relatedKeywords: ['environment', 'carbon', 'renewable'],
         peakHour: 10,
       },
-      {
-        id: 'topic-startup-demo',
-        name: 'startup funding',
-        slug: 'startup-funding',
-        frequency: 12,
-        sourceCount: 2,
-        firstSeen: new Date(now.getTime() - 4 * 60 * 60 * 1000).toISOString(),
-        lastSeen: now.toISOString(),
-        trendScore: 48,
-        velocityScore: 12,
-        aiPredictionScore: 10,
-        aiPredictionReason: 'Tech sector interest but limited mainstream reach',
-        relatedStories: ['hn-3', 'lobsters-2'],
-        relatedKeywords: ['venture capital', 'series a', 'fundraising'],
-        peakHour: 16,
-      },
     ],
     topStories: [
       {
@@ -457,35 +395,29 @@ function generateDemoDashboard(): ScannerDashboard {
         keywords: ['openai', 'artificial', 'intelligence', 'reasoning'],
         topics: ['technology'],
         sourceId: 'hackernews',
-        sourceName: 'HackerNews',
-        detectedAt: now.toISOString(),
-        status: 'flagged',
-      },
-      {
-        id: 'demo-guardian-1',
-        title: 'World Leaders Gather for Climate Summit',
-        url: 'https://example.com/climate-summit',
-        contentSnippet: 'Leaders from over 100 countries are meeting to discuss new climate commitments...',
-        publishedAt: new Date(now.getTime() - 4 * 60 * 60 * 1000).toISOString(),
-        score: 0,
-        commentCount: 0,
-        engagementVelocity: 0,
-        keywords: ['climate', 'summit', 'leaders', 'world'],
-        topics: ['news', 'world'],
-        sourceId: 'guardian',
-        sourceName: 'The Guardian',
+        sourceName: 'Hacker News',
         detectedAt: now.toISOString(),
         status: 'flagged',
       },
     ],
-    sourceStats: [
-      { sourceId: 'hackernews', sourceName: 'HackerNews', storiesFound: 47, avgEngagement: 125.3, lastSuccess: now.toISOString(), errorCount: 0 },
-      { sourceId: 'lobsters', sourceName: 'Lobsters', storiesFound: 32, avgEngagement: 45.8, lastSuccess: now.toISOString(), errorCount: 0 },
-      { sourceId: 'guardian', sourceName: 'The Guardian', storiesFound: 48, avgEngagement: 0, lastSuccess: now.toISOString(), errorCount: 0 },
-    ],
+    // Generate stats from enabled sources
+    sourceStats: enabledSources.map(source => ({
+      sourceId: source.slug,
+      sourceName: source.name,
+      storiesFound: Math.floor(Math.random() * 50) + 10,
+      avgEngagement: source.source_type === 'api' ? Math.random() * 100 : 0,
+      lastSuccess: now.toISOString(),
+      errorCount: 0,
+    })),
     recentScans: [
-      { id: 'scan-1', timestamp: new Date(now.getTime() - 5 * 60 * 1000).toISOString(), sourcesScanned: ['hackernews', 'lobsters', 'guardian'], storiesFound: 127, newTopics: 3, durationMs: 2340 },
-      { id: 'scan-2', timestamp: new Date(now.getTime() - 35 * 60 * 1000).toISOString(), sourcesScanned: ['hackernews', 'lobsters', 'guardian'], storiesFound: 124, newTopics: 2, durationMs: 2180 },
+      {
+        id: 'scan-1',
+        timestamp: new Date(now.getTime() - 5 * 60 * 1000).toISOString(),
+        sourcesScanned: enabledSources.map(s => s.slug),
+        storiesFound: 127,
+        newTopics: 3,
+        durationMs: 2340,
+      },
     ],
   };
 }
@@ -494,9 +426,7 @@ function generateDemoDashboard(): ScannerDashboard {
 
 export async function GET() {
   try {
-    // For demo mode, return mock dashboard
-    // In production, this would fetch from Supabase or run a fresh scan
-    const dashboard = generateDemoDashboard();
+    const dashboard = await generateDashboard();
     return NextResponse.json(dashboard);
   } catch (error) {
     console.error('Scanner GET error:', error);
@@ -510,7 +440,7 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     const body: ScanRequest = await request.json();
-    const result = await scanAllSources(body);
+    const result = await scanSourcesFromDB(body);
     return NextResponse.json(result);
   } catch (error) {
     console.error('Scanner POST error:', error);

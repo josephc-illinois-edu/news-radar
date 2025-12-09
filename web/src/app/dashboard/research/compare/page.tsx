@@ -83,14 +83,21 @@ function ComparePageContent() {
   };
 
   const handleGenerateContent = () => {
-    // Store context for Create page
+    // Store context for Create page in StoredResearchContext format
     const urls = articles.map(a => a.url).join('\n');
     const notesText = notes.map(n => n.content).join('\n\n');
 
     sessionStorage.setItem('create-research-context', JSON.stringify({
-      articles,
-      notes: notesText,
-      analysis,
+      context: {
+        stories: articles,
+        notes: notesText || undefined,
+        analysis: analysis ? {
+          similarities: analysis.similarities.map(s => s.text),
+          differences: analysis.differences.map(d => d.text),
+          keyThemes: analysis.keyThemes,
+        } : undefined,
+      },
+      createdAt: new Date().toISOString(),
     }));
 
     router.push(`/dashboard/create?mode=synthesis&urls=${encodeURIComponent(urls)}`);

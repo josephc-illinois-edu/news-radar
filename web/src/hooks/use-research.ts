@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import type {
   ScanOptions,
@@ -185,11 +185,17 @@ export function useComparisonNotes(sessionId: string) {
 const SELECTED_ARTICLES_KEY = 'research-selected-articles';
 
 export function useArticleSelection() {
-  const [selected, setSelectedState] = useState<StoryResult[]>(() => {
-    if (typeof window === 'undefined') return [];
+  const [selected, setSelectedState] = useState<StoryResult[]>([]);
+  const [isHydrated, setIsHydrated] = useState(false);
+
+  // Load from localStorage after hydration to avoid mismatch
+  useEffect(() => {
     const stored = localStorage.getItem(SELECTED_ARTICLES_KEY);
-    return stored ? JSON.parse(stored) : [];
-  });
+    if (stored) {
+      setSelectedState(JSON.parse(stored));
+    }
+    setIsHydrated(true);
+  }, []);
 
   const setSelected = useCallback((articles: StoryResult[]) => {
     setSelectedState(articles);
@@ -240,5 +246,6 @@ export function useArticleSelection() {
     isSelected,
     toggleSelection,
     canAddMore: selected.length < 5,
+    isHydrated,
   };
 }

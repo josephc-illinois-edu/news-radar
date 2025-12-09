@@ -34,6 +34,7 @@ import {
   getRecommendedAngle,
 } from '@/hooks/use-synthesis';
 import type { SuggestedAngle, SynthesisResult, ResearchContext } from '@/types/synthesis';
+import type { EditorialPosition } from '@/types/database';
 
 const DEFAULT_TONE: ToneSettings = {
   humor: 3,
@@ -86,6 +87,10 @@ function CreatePageContent() {
   const [variations, setVariations] = useState(1);
   const [attributionStyle, setAttributionStyle] = useState<'inline' | 'footnotes' | 'endnotes'>('inline');
 
+  // Editorial controls
+  const [editorialPosition, setEditorialPosition] = useState<EditorialPosition>('neutral');
+  const [editorialNotes, setEditorialNotes] = useState('');
+
   // Synthesis state
   const { data: researchContext, clearContext } = useResearchContext();
   const synthesizeMutation = useSynthesizeResearch();
@@ -100,7 +105,7 @@ function CreatePageContent() {
 
   // Load synthesis context and run analysis
   useEffect(() => {
-    if (isSynthesisMode && researchContext && !synthesis && !synthesizeMutation.isPending) {
+    if (isSynthesisMode && researchContext?.context?.stories && !synthesis && !synthesizeMutation.isPending) {
       synthesizeMutation.mutate(
         { context: researchContext.context },
         { onSuccess: (data) => setSynthesis(data) }
@@ -126,7 +131,7 @@ function CreatePageContent() {
 
   const handleGenerate = async () => {
     // Synthesis mode generation
-    if (isSynthesisMode && selectedAngle && researchContext) {
+    if (isSynthesisMode && selectedAngle && researchContext?.context?.stories) {
       setIsGenerating(true);
       setError(null);
       setResults([]);
@@ -227,6 +232,8 @@ function CreatePageContent() {
           tone_urgency: tone.urgency,
           tone_optimism: tone.optimism,
           tone_criticism: tone.criticism,
+          editorial_position: editorialPosition,
+          editorial_notes: editorialNotes || undefined,
           hashtags: article.suggestedHashtags,
           status: 'draft',
         }),
@@ -263,8 +270,8 @@ function CreatePageContent() {
           </p>
         </div>
 
-        {/* No research context */}
-        {!researchContext && (
+        {/* No research context or invalid context */}
+        {(!researchContext || !researchContext.context?.stories) && (
           <Card>
             <CardContent className="py-8 text-center">
               <p className="text-muted-foreground mb-4">
@@ -278,7 +285,7 @@ function CreatePageContent() {
         )}
 
         {/* Loading synthesis */}
-        {researchContext && synthesizeMutation.isPending && (
+        {researchContext?.context?.stories && synthesizeMutation.isPending && (
           <Card>
             <CardContent className="py-8 text-center">
               <div className="animate-pulse space-y-2">
@@ -290,14 +297,14 @@ function CreatePageContent() {
         )}
 
         {/* Synthesis error */}
-        {synthesizeMutation.error && (
+        {synthesizeMutation.error && researchContext?.context && (
           <Card className="border-destructive">
             <CardContent className="pt-6">
               <p className="text-destructive">{synthesizeMutation.error.message}</p>
               <Button
                 variant="outline"
                 className="mt-4"
-                onClick={() => synthesizeMutation.mutate({ context: researchContext!.context })}
+                onClick={() => synthesizeMutation.mutate({ context: researchContext.context })}
               >
                 Retry Analysis
               </Button>
@@ -306,7 +313,7 @@ function CreatePageContent() {
         )}
 
         {/* Main synthesis workflow */}
-        {researchContext && synthesis && (
+        {researchContext?.context?.stories && synthesis && (
           <div className="grid gap-6 lg:grid-cols-3">
             {/* Left: Research Context & Angles */}
             <div className="lg:col-span-1 space-y-4">
@@ -411,6 +418,40 @@ function CreatePageContent() {
                         ))}
                       </SelectContent>
                     </Select>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Editorial Controls */}
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-base">Editorial Position</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-2">
+                    <Label>Position / Bias</Label>
+                    <Select value={editorialPosition} onValueChange={(v) => setEditorialPosition(v as EditorialPosition)}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="neutral">Neutral</SelectItem>
+                        <SelectItem value="left">Left</SelectItem>
+                        <SelectItem value="center-left">Center-Left</SelectItem>
+                        <SelectItem value="center">Center</SelectItem>
+                        <SelectItem value="center-right">Center-Right</SelectItem>
+                        <SelectItem value="right">Right</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Editorial Notes</Label>
+                    <Textarea
+                      value={editorialNotes}
+                      onChange={(e) => setEditorialNotes(e.target.value)}
+                      placeholder="Add editorial guidelines or context..."
+                      className="min-h-[80px]"
+                    />
                   </div>
                 </CardContent>
               </Card>
@@ -718,6 +759,41 @@ function CreatePageContent() {
                 lowLabel="Supportive"
                 highLabel="Critical"
               />
+            </CardContent>
+          </Card>
+
+          {/* Editorial Controls */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Editorial Position</CardTitle>
+              <CardDescription>Set your editorial stance</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label>Position / Bias</Label>
+                <Select value={editorialPosition} onValueChange={(v) => setEditorialPosition(v as EditorialPosition)}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="neutral">Neutral</SelectItem>
+                    <SelectItem value="left">Left</SelectItem>
+                    <SelectItem value="center-left">Center-Left</SelectItem>
+                    <SelectItem value="center">Center</SelectItem>
+                    <SelectItem value="center-right">Center-Right</SelectItem>
+                    <SelectItem value="right">Right</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Editorial Notes</Label>
+                <Textarea
+                  value={editorialNotes}
+                  onChange={(e) => setEditorialNotes(e.target.value)}
+                  placeholder="Add editorial guidelines or context..."
+                  className="min-h-[80px]"
+                />
+              </div>
             </CardContent>
           </Card>
 

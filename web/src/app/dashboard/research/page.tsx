@@ -239,8 +239,8 @@ function StoryCard({
             </div>
             {story.keywords.length > 0 && (
               <div className="flex flex-wrap gap-1 mt-2">
-                {story.keywords.slice(0, 5).map((keyword) => (
-                  <Badge key={keyword} variant="secondary" className="text-xs">
+                {story.keywords.slice(0, 5).map((keyword, idx) => (
+                  <Badge key={`${keyword}-${idx}`} variant="secondary" className="text-xs">
                     {keyword}
                   </Badge>
                 ))}

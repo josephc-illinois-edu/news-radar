@@ -104,15 +104,43 @@ export default function ArticleDetailPage({ params }: { params: Promise<{ id: st
 
         <TabsContent value="content" className="space-y-4">
           {/* Featured Image Preview */}
-          {article.featured_image_platform && article.featured_image_style && (
+          {article.featured_image_url ? (
+            <Card>
+              <CardHeader className="pb-2">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-sm">Featured Image</CardTitle>
+                  <div className="flex gap-1">
+                    {article.featured_image_platform && (
+                      <Badge variant="secondary" className="text-xs">
+                        {PLATFORM_CONFIGS[article.featured_image_platform]?.name || article.featured_image_platform}
+                      </Badge>
+                    )}
+                    {article.featured_image_style && (
+                      <Badge variant="secondary" className="text-xs">
+                        {IMAGE_STYLES[article.featured_image_style]?.name || article.featured_image_style}
+                      </Badge>
+                    )}
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="border rounded-lg overflow-hidden bg-muted">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={article.featured_image_url}
+                    alt={article.title}
+                    className="w-full h-auto"
+                  />
+                </div>
+              </CardContent>
+            </Card>
+          ) : article.featured_image_platform && article.featured_image_style ? (
             <FeaturedImagePreview
               title={article.title}
               platform={article.featured_image_platform}
               style={article.featured_image_style}
             />
-          )}
-
-          {!article.featured_image_platform && (
+          ) : (
             <Card className="border-dashed">
               <CardContent className="py-4 text-center text-muted-foreground text-sm">
                 No featured image.{' '}

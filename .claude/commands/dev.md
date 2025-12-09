@@ -1,13 +1,13 @@
 ---
-description: Clean up port 3000 and start web dev server fresh
+description: Kill all node processes and start web dev server fresh on port 3005
 allowed-tools: Bash
 ---
 
 Execute these steps to start the dev server cleanly:
 
-1. First, find and kill only processes using port 3000 (Git Bash):
+1. Kill any existing node processes:
 ```bash
-netstat -ano | grep ':3000.*LISTENING' | awk '{print $5}' | head -1 | xargs -r -I{} taskkill //F //PID {} 2>/dev/null
+taskkill //F //IM node.exe 2>/dev/null
 ```
 
 2. Clean up stale files:
@@ -20,6 +20,4 @@ rm -f web/.next/dev/lock
 cd web && npm run dev
 ```
 
-Run in background so the server stays running. Report when server is ready at http://localhost:3000.
-
-If port 3000 is still blocked after cleanup, report the conflict.
+Run in background so the server stays running. Report when server is ready at http://localhost:3005.
