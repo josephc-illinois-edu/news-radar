@@ -147,6 +147,11 @@ export interface RewriteRequest {
   content: string;
   instruction: string;
   model?: RewriteModel;
+  // Rewrite mode: 'full' rewrites entire content, 'partial' rewrites selection with context
+  mode?: 'full' | 'partial';
+  // For partial mode: surrounding context to help AI understand but not rewrite
+  context_before?: string;
+  context_after?: string;
   // Editorial context
   editorial_position?: EditorialPosition;
   editorial_notes?: string;
@@ -216,4 +221,24 @@ export interface TagFilters {
   search?: string;
   limit?: number;
   offset?: number;
+}
+
+// Published posts tracking
+export interface DBPublishedPost {
+  id: string;
+  article_id: string;
+  platform: string;
+  status: 'pending' | 'scheduled' | 'published' | 'failed';
+  post_url?: string;
+  external_post_id?: string;
+  published_at?: string;
+  scheduled_at?: string;
+  error?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+// Article with published posts for list view
+export interface DBArticleWithPublishedPosts extends DBArticle {
+  published_posts?: DBPublishedPost[];
 }

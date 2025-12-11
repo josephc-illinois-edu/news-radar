@@ -2,6 +2,10 @@
  * Article Rewrite API
  * POST /api/articles/rewrite - Rewrite content with Claude (Haiku or Sonnet)
  *
+ * Supports two modes:
+ * - 'full' (default): Rewrites entire content
+ * - 'partial': Rewrites only selected text with surrounding context for understanding
+ *
  * Uses editorial context (position, criticism level, notes) to guide rewrites.
  * Haiku is default (~100x cheaper than Opus), Sonnet available for complex rewrites.
  */
@@ -31,6 +35,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       content,
       instruction,
       model: rawModel = 'haiku',
+      mode = 'full',
+      context_before,
+      context_after,
       editorial_position,
       editorial_notes,
       tone_humor,
@@ -66,17 +73,30 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       return NextResponse.json({ success: true, data: mockResult });
     }
 
-    // Build prompt with editorial context
-    const prompt = buildRewritePrompt({
-      content,
-      instruction,
-      editorial_position,
-      editorial_notes,
-      tone_humor,
-      tone_urgency,
-      tone_criticism,
-      tone_optimism,
-    });
+    // Build prompt with editorial context (full or partial mode)
+    const prompt = mode === 'partial'
+      ? buildPartialRewritePrompt({
+          content,
+          instruction,
+          context_before,
+          context_after,
+          editorial_position,
+          editorial_notes,
+          tone_humor,
+          tone_urgency,
+          tone_criticism,
+          tone_optimism,
+        })
+      : buildRewritePrompt({
+          content,
+          instruction,
+          editorial_position,
+          editorial_notes,
+          tone_humor,
+          tone_urgency,
+          tone_criticism,
+          tone_optimism,
+        });
 
     // Call Claude API
     const modelConfig = MODEL_CONFIG[model];
@@ -190,6 +210,93 @@ ${instruction}
 
 ## Output
 Provide only the rewritten content, without any preamble, explanation, or commentary. The output should be ready to use directly.`;
+}
+
+function buildPartialRewritePrompt(params: {
+  content: string;
+  instruction: string;
+  context_before?: string;
+  context_after?: string;
+  editorial_position?: EditorialPosition;
+  editorial_notes?: string;
+  tone_humor?: number;
+  tone_urgency?: number;
+  tone_criticism?: number;
+  tone_optimism?: number;
+}): string {
+  const {
+    content,
+    instruction,
+    context_before,
+    context_after,
+    editorial_position,
+    editorial_notes,
+    tone_humor,
+    tone_urgency,
+    tone_criticism,
+    tone_optimism,
+  } = params;
+
+  let editorialContext = '';
+
+  if (editorial_position && editorial_position !== 'neutral') {
+    const positionGuide = {
+      left: 'progressive, emphasizing social justice, equity, and systemic critiques',
+      'center-left': 'moderately progressive, balanced but leaning toward reform',
+      center: 'balanced, presenting multiple viewpoints equally',
+      'center-right': 'moderately conservative, emphasizing tradition and measured change',
+      right: 'conservative, emphasizing individual responsibility and traditional values',
+    };
+    editorialContext += `\nEditorial position: ${positionGuide[editorial_position] || editorial_position}`;
+  }
+
+  if (tone_humor !== undefined && tone_humor !== 50) {
+    const humorLevel = tone_humor > 70 ? 'playful and witty' : tone_humor > 40 ? 'balanced with light touches' : 'serious and straightforward';
+    editorialContext += `\nHumor: ${humorLevel}`;
+  }
+
+  if (tone_urgency !== undefined && tone_urgency !== 50) {
+    const urgencyLevel = tone_urgency > 70 ? 'urgent, time-sensitive' : tone_urgency > 40 ? 'moderately pressing' : 'relaxed, evergreen';
+    editorialContext += `\nUrgency: ${urgencyLevel}`;
+  }
+
+  if (tone_optimism !== undefined && tone_optimism !== 50) {
+    const optimismLevel = tone_optimism > 70 ? 'optimistic' : tone_optimism > 40 ? 'balanced' : 'cautious/pessimistic';
+    editorialContext += `\nOptimism: ${optimismLevel}`;
+  }
+
+  if (tone_criticism !== undefined && tone_criticism !== 50) {
+    const criticismLevel = tone_criticism > 70 ? 'highly critical' : tone_criticism > 40 ? 'moderately critical' : 'supportive';
+    editorialContext += `\nCriticism: ${criticismLevel}`;
+  }
+
+  if (editorial_notes?.trim()) {
+    editorialContext += `\nAdditional notes: ${editorial_notes}`;
+  }
+
+  // Build context sections
+  const contextBeforeSection = context_before?.trim()
+    ? `## Context Before (DO NOT include in output)\n${context_before}\n`
+    : '';
+
+  const contextAfterSection = context_after?.trim()
+    ? `## Context After (DO NOT include in output)\n${context_after}`
+    : '';
+
+  return `You are an expert editor. Rewrite ONLY the selected text according to the instruction. The context is provided for understanding but should NOT be included in your output.
+${editorialContext ? `\n## Editorial Guidelines${editorialContext}` : ''}
+
+${contextBeforeSection}
+## Selected Text (REWRITE THIS)
+${content}
+
+${contextAfterSection}
+
+## Instruction
+${instruction}
+
+## Output
+Provide ONLY the rewritten version of the selected text. Do not include any context, preamble, or explanation. The output should seamlessly replace the selected text.`;
 }
 
 function generateMockRewrite(content: string, instruction: string): RewriteResponse {

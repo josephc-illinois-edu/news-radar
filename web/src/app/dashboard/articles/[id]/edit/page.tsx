@@ -1,9 +1,9 @@
 'use client';
 
-import { use, useState, useEffect } from 'react';
+import { use, useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useArticle, useUpdateArticle, articleKeys } from '@/hooks/use-articles';
+import { useArticle, useUpdateArticle, useUpdateSubstack, articleKeys } from '@/hooks/use-articles';
 import { useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -27,10 +27,11 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { FeaturedImageGenerator } from '@/components/articles/featured-image-generator';
 import { OriginalityChecker } from '@/components/articles/originality-checker';
+import { InlineRefinement } from '@/components/articles/inline-refinement';
 import { PLATFORM_CONFIGS, type ImagePlatform, type ImageStyle } from '@/types/graphics';
 import type { EditorialPosition, RewriteModel, RewriteResponse } from '@/types/database';
 import { Slider } from '@/components/ui/slider';
-import { Loader2, Sparkles, ChevronDown, ChevronUp } from 'lucide-react';
+import { Loader2, Sparkles, ChevronDown, ChevronUp, Upload, ExternalLink } from 'lucide-react';
 
 export default function ArticleEditPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -39,6 +40,7 @@ export default function ArticleEditPage({ params }: { params: Promise<{ id: stri
 
   const { data: article, isLoading, error } = useArticle(id);
   const updateArticle = useUpdateArticle();
+  const updateSubstack = useUpdateSubstack();
 
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
@@ -65,6 +67,12 @@ export default function ArticleEditPage({ params }: { params: Promise<{ id: stri
   const [isRewriting, setIsRewriting] = useState(false);
   const [rewriteResult, setRewriteResult] = useState<RewriteResponse | null>(null);
   const [showRewritePanel, setShowRewritePanel] = useState(false);
+
+  // Substack update feedback
+  const [substackMessage, setSubstackMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  // Textarea ref for inline refinement
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   // Initialize form when article loads
   useEffect(() => {
@@ -268,8 +276,65 @@ export default function ArticleEditPage({ params }: { params: Promise<{ id: stri
           >
             {updateArticle.isPending ? 'Saving...' : 'Save Changes'}
           </Button>
+          {article?.status === 'published' && (
+            <Button
+              variant="secondary"
+              onClick={() => {
+                setSubstackMessage(null);
+                updateSubstack.mutate(id, {
+                  onSuccess: (data) => {
+                    setSubstackMessage({
+                      type: 'success',
+                      text: data.message || 'Article updated on Substack successfully!',
+                    });
+                  },
+                  onError: (error) => {
+                    setSubstackMessage({
+                      type: 'error',
+                      text: error instanceof Error ? error.message : 'Failed to update on Substack',
+                    });
+                  },
+                });
+              }}
+              disabled={updateSubstack.isPending || isDirty}
+              title={isDirty ? 'Save changes before updating Substack' : 'Update the published post on Substack'}
+            >
+              {updateSubstack.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" aria-hidden="true" />
+                  Updating...
+                </>
+              ) : (
+                <>
+                  <Upload className="h-4 w-4 mr-2" aria-hidden="true" />
+                  Sync to Substack
+                </>
+              )}
+            </Button>
+          )}
         </div>
       </div>
+
+      {/* Substack update feedback */}
+      {substackMessage && (
+        <div
+          className={`p-4 rounded-lg flex items-center justify-between ${
+            substackMessage.type === 'success'
+              ? 'bg-green-500/10 border border-green-500/30 text-green-700 dark:text-green-400'
+              : 'bg-red-500/10 border border-red-500/30 text-red-700 dark:text-red-400'
+          }`}
+        >
+          <span>{substackMessage.text}</span>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setSubstackMessage(null)}
+            className="h-6 w-6 p-0"
+          >
+            ×
+          </Button>
+        </div>
+      )}
 
       <div className="grid gap-6 lg:grid-cols-3">
         {/* Main Editor */}
@@ -302,12 +367,29 @@ export default function ArticleEditPage({ params }: { params: Promise<{ id: stri
                   <TabsTrigger value="preview">Preview</TabsTrigger>
                 </TabsList>
                 <TabsContent value="write">
-                  <textarea
-                    value={content}
-                    onChange={(e) => setContent(e.target.value)}
-                    placeholder="Write your article content..."
-                    className="min-h-[400px] w-full resize-y rounded-md border bg-background p-4 text-sm focus:outline-none focus:ring-2 focus:ring-ring font-mono"
-                  />
+                  <div className="relative">
+                    <textarea
+                      ref={textareaRef}
+                      value={content}
+                      onChange={(e) => setContent(e.target.value)}
+                      placeholder="Write your article content..."
+                      className="min-h-[400px] w-full resize-y rounded-md border bg-background p-4 text-sm focus:outline-none focus:ring-2 focus:ring-ring font-mono"
+                    />
+                    <InlineRefinement
+                      textareaRef={textareaRef}
+                      content={content}
+                      articleId={id}
+                      onApply={setContent}
+                      editorialContext={{
+                        editorial_position: editorialPosition,
+                        editorial_notes: editorialNotes,
+                        tone_humor: toneHumor,
+                        tone_urgency: toneUrgency,
+                        tone_criticism: toneCriticism,
+                        tone_optimism: toneOptimism,
+                      }}
+                    />
+                  </div>
                 </TabsContent>
                 <TabsContent value="preview">
                   <div className="min-h-[400px] rounded-md border p-4 prose prose-neutral dark:prose-invert max-w-none">
