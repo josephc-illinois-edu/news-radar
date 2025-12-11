@@ -8,68 +8,39 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import type { PlatformConnection, PublishPlatform } from '@/types/publish';
 
-// Demo connections (production would store in database)
-const demoConnections: PlatformConnection[] = [
-  {
-    id: 'conn-1',
-    platform: 'facebook',
-    name: 'My Facebook Page',
-    username: 'mypage',
-    connected: false,
-  },
-  {
-    id: 'conn-2',
-    platform: 'linkedin',
-    name: 'LinkedIn Profile',
-    username: 'john-doe',
-    connected: false,
-  },
-  {
-    id: 'conn-3',
-    platform: 'twitter',
-    name: 'Twitter/X',
-    username: '@johndoe',
-    connected: false,
-  },
-  {
-    id: 'conn-4',
-    platform: 'medium',
-    name: 'Medium',
-    connected: false,
-  },
-  {
-    id: 'conn-5',
-    platform: 'wordpress',
-    name: 'WordPress Blog',
-    connected: false,
-  },
-  {
-    id: 'conn-6',
-    platform: 'ghost',
-    name: 'Ghost Blog',
-    connected: false,
-  },
-];
+// Check if Substack is configured via environment variables
+function isSubstackConfigured(): boolean {
+  return !!(
+    process.env.SUBSTACK_EMAIL &&
+    process.env.SUBSTACK_PASSWORD &&
+    process.env.SUBSTACK_PUBLICATION_URL
+  );
+}
+
+// Get connections - currently only Substack is supported
+function getConnections(): PlatformConnection[] {
+  const substackConfigured = isSubstackConfigured();
+  const substackUrl = process.env.SUBSTACK_PUBLICATION_URL;
+
+  return [
+    {
+      id: 'conn-substack',
+      platform: 'substack',
+      name: substackUrl || 'Substack Newsletter',
+      username: process.env.SUBSTACK_EMAIL || undefined,
+      connected: substackConfigured,
+      connectedAt: substackConfigured ? new Date().toISOString() : undefined,
+    },
+  ];
+}
 
 export async function GET() {
   try {
-    const supabase = await createClient();
+    // Return connections based on env vars - no auth required for this
+    // In production with user-specific OAuth connections, you'd check auth here
+    // and merge env-based connections with user's OAuth connections from DB
 
-    // Check auth if Supabase is configured
-    if (supabase) {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-      }
-    }
-
-    // In production, fetch from database
-    // const { data, error } = await supabase
-    //   .from('platform_connections')
-    //   .select('*')
-    //   .eq('user_id', user.id);
-
-    return NextResponse.json({ data: demoConnections });
+    return NextResponse.json({ data: getConnections() });
   } catch (error) {
     console.error('Fetch connections error:', error);
     return NextResponse.json(

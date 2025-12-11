@@ -1369,20 +1369,26 @@ function QuickScanDialog({
 
           {/* Results */}
           {scanResults.length > 0 && (
-            <div className="flex-1 overflow-hidden flex flex-col">
+            <div className="flex flex-col">
               <div className="flex items-center justify-between mb-2">
-                <Label className="text-sm font-medium">
+                <Label className="text-sm font-medium" id="articles-results-label">
                   Found {scanResults.length} articles
                 </Label>
                 <span className="text-xs text-muted-foreground">
                   {selectedArticles.size}/5 selected
                 </span>
               </div>
-              <ScrollArea className="flex-1 border rounded-md">
-                <div className="p-2 space-y-1">
+              <div
+                className="h-[280px] overflow-y-auto border rounded-md"
+                aria-labelledby="articles-results-label"
+                tabIndex={0}
+              >
+                <div className="p-2 space-y-1" role="listbox" aria-label="Search results">
                   {scanResults.map((article) => (
                     <button
                       key={article.id}
+                      role="option"
+                      aria-selected={selectedArticles.has(article.id)}
                       onClick={() => toggleArticle(article.id)}
                       className={`w-full text-left p-3 rounded-md transition-colors ${
                         selectedArticles.has(article.id)
@@ -1426,7 +1432,7 @@ function QuickScanDialog({
                     </button>
                   ))}
                 </div>
-              </ScrollArea>
+              </div>
             </div>
           )}
         </div>

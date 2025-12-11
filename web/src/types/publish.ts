@@ -2,7 +2,7 @@
  * Publishing types
  */
 
-export type PublishPlatform = 'facebook' | 'linkedin' | 'twitter' | 'medium' | 'wordpress' | 'ghost';
+export type PublishPlatform = 'substack';
 export type PublishStatus = 'draft' | 'scheduled' | 'published' | 'failed';
 
 export interface PlatformConnection {
@@ -62,47 +62,11 @@ export const PLATFORM_INFO: Record<PublishPlatform, {
   supportsScheduling: boolean;
   authType: 'oauth' | 'api_key' | 'webhook';
 }> = {
-  facebook: {
-    name: 'Facebook',
-    icon: 'facebook',
+  substack: {
+    name: 'Substack',
+    icon: 'mail',
     supportsImages: true,
     supportsScheduling: true,
-    authType: 'oauth',
-  },
-  linkedin: {
-    name: 'LinkedIn',
-    icon: 'linkedin',
-    supportsImages: true,
-    supportsScheduling: true,
-    authType: 'oauth',
-  },
-  twitter: {
-    name: 'Twitter/X',
-    icon: 'twitter',
-    maxLength: 280,
-    supportsImages: true,
-    supportsScheduling: true,
-    authType: 'oauth',
-  },
-  medium: {
-    name: 'Medium',
-    icon: 'medium',
-    supportsImages: true,
-    supportsScheduling: false,
-    authType: 'api_key',
-  },
-  wordpress: {
-    name: 'WordPress',
-    icon: 'wordpress',
-    supportsImages: true,
-    supportsScheduling: true,
-    authType: 'api_key',
-  },
-  ghost: {
-    name: 'Ghost',
-    icon: 'ghost',
-    supportsImages: true,
-    supportsScheduling: true,
-    authType: 'api_key',
+    authType: 'api_key', // Uses browser automation with email/password credentials
   },
 };

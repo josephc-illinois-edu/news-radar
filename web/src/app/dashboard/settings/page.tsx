@@ -241,46 +241,69 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJ...`}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="flex items-start gap-3 rounded-lg border border-blue-500/50 bg-blue-500/5 p-4">
-                <Shield className="h-5 w-5 text-blue-500 shrink-0 mt-0.5" />
-                <div className="text-sm">
-                  <p className="font-medium">Platform integration coming soon</p>
-                  <p className="text-muted-foreground mt-1">
-                    Social media platform connections (Twitter/X, LinkedIn, Facebook, Medium)
-                    will be available in a future update. For now, you can export content and
-                    publish manually.
-                  </p>
+              {/* Substack - configured via env vars */}
+              {connections.find(c => c.platform === 'substack')?.connected && (
+                <div className="flex items-start gap-3 rounded-lg border border-green-500/50 bg-green-500/5 p-4">
+                  <CheckCircle2 className="h-5 w-5 text-green-500 shrink-0 mt-0.5" />
+                  <div className="text-sm">
+                    <p className="font-medium">Substack Connected</p>
+                    <p className="text-muted-foreground mt-1">
+                      Your Substack newsletter is configured and ready for publishing via browser automation.
+                    </p>
+                  </div>
                 </div>
-              </div>
+              )}
+
+              {!connections.find(c => c.platform === 'substack')?.connected && (
+                <div className="flex items-start gap-3 rounded-lg border border-amber-500/50 bg-amber-500/5 p-4">
+                  <AlertTriangle className="h-5 w-5 text-amber-500 shrink-0 mt-0.5" />
+                  <div className="text-sm">
+                    <p className="font-medium">Substack Not Configured</p>
+                    <p className="text-muted-foreground mt-1">
+                      Add SUBSTACK_EMAIL, SUBSTACK_PASSWORD, and SUBSTACK_PUBLICATION_URL to your .env.local file to enable Substack publishing.
+                    </p>
+                  </div>
+                </div>
+              )}
 
               <Separator />
 
               <div className="space-y-3">
-                {[
-                  { name: 'Twitter/X', icon: '𝕏', status: 'Coming Soon' },
-                  { name: 'LinkedIn', icon: 'in', status: 'Coming Soon' },
-                  { name: 'Facebook', icon: 'f', status: 'Coming Soon' },
-                  { name: 'Medium', icon: 'M', status: 'Coming Soon' },
-                  { name: 'WordPress', icon: 'W', status: 'Coming Soon' },
-                ].map((platform) => (
+                {/* Substack - actual status from API */}
+                {connections.filter(c => c.platform === 'substack').map((conn) => (
                   <div
-                    key={platform.name}
-                    className="flex items-center justify-between p-4 rounded-lg border bg-muted/30"
+                    key={conn.platform}
+                    className={`flex items-center justify-between p-4 rounded-lg border ${conn.connected ? 'border-green-500/30 bg-green-500/5' : 'bg-muted/30'}`}
                   >
                     <div className="flex items-center gap-3">
-                      <div className="h-10 w-10 rounded-lg bg-muted flex items-center justify-center font-bold">
-                        {platform.icon}
+                      <div className="h-10 w-10 rounded-lg bg-orange-500 flex items-center justify-center font-bold text-white">
+                        S
                       </div>
                       <div>
-                        <p className="font-medium">{platform.name}</p>
-                        <p className="text-sm text-muted-foreground">Not connected</p>
+                        <p className="font-medium">Substack</p>
+                        <p className="text-sm text-muted-foreground">
+                          {conn.connected ? conn.name : 'Not connected'}
+                        </p>
                       </div>
                     </div>
-                    <Button variant="outline" size="sm" disabled>
-                      {platform.status}
-                    </Button>
+                    <Badge variant={conn.connected ? 'default' : 'outline'}>
+                      {conn.connected ? 'Connected' : 'Not Configured'}
+                    </Badge>
                   </div>
                 ))}
+
+                <p className="text-sm text-muted-foreground pt-2">
+                  Connect your social accounts (Twitter/X, Facebook, LinkedIn) directly in your{' '}
+                  <a
+                    href="https://substack.com/settings"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-primary hover:underline"
+                  >
+                    Substack settings
+                  </a>
+                  {' '}to auto-share when publishing.
+                </p>
               </div>
             </CardContent>
           </Card>

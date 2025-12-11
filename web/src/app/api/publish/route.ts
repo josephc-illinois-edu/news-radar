@@ -7,81 +7,54 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import type { PublishRequest, PublishResult, PublishPlatform } from '@/types/publish';
 
-// Simulated platform publishers (production would use real APIs)
-async function publishToFacebook(content: string, imageUrl?: string): Promise<PublishResult> {
-  // Facebook Graph API integration would go here
-  return {
-    platform: 'facebook',
-    status: 'published',
-    url: 'https://facebook.com/post/demo-123',
-    postId: 'demo-123',
-    publishedAt: new Date().toISOString(),
-  };
-}
+async function publishToSubstack(content: string, title?: string): Promise<PublishResult> {
+  // Check if Substack credentials are configured
+  const email = process.env.SUBSTACK_EMAIL;
+  const password = process.env.SUBSTACK_PASSWORD;
+  const publicationUrl = process.env.SUBSTACK_PUBLICATION_URL;
 
-async function publishToLinkedIn(content: string, imageUrl?: string): Promise<PublishResult> {
-  // LinkedIn API integration would go here
-  return {
-    platform: 'linkedin',
-    status: 'published',
-    url: 'https://linkedin.com/feed/update/demo-456',
-    postId: 'demo-456',
-    publishedAt: new Date().toISOString(),
-  };
-}
+  if (!email || !password || !publicationUrl) {
+    // Return demo result if not configured
+    return {
+      platform: 'substack',
+      status: 'published',
+      url: `https://${publicationUrl || 'demo'}.substack.com/p/demo-post`,
+      postId: 'demo-post',
+      publishedAt: new Date().toISOString(),
+    };
+  }
 
-async function publishToTwitter(content: string, imageUrl?: string): Promise<PublishResult> {
-  // Twitter/X API integration would go here
-  const truncated = content.length > 280 ? content.slice(0, 277) + '...' : content;
-  return {
-    platform: 'twitter',
-    status: 'published',
-    url: 'https://twitter.com/user/status/demo-789',
-    postId: 'demo-789',
-    publishedAt: new Date().toISOString(),
-  };
-}
+  // Dynamic import to avoid loading Puppeteer unless needed
+  try {
+    const { SubstackPublisher } = await import('@/lib/substack-publisher');
+    const publisher = new SubstackPublisher();
 
-async function publishToMedium(content: string, title?: string): Promise<PublishResult> {
-  // Medium API integration would go here
-  return {
-    platform: 'medium',
-    status: 'published',
-    url: 'https://medium.com/@user/demo-article',
-    postId: 'demo-article',
-    publishedAt: new Date().toISOString(),
-  };
-}
+    const result = await publisher.publish({
+      id: 'temp',
+      title: title || 'Untitled',
+      content,
+      created_at: new Date().toISOString(),
+    });
 
-async function publishToWordPress(content: string, title?: string): Promise<PublishResult> {
-  // WordPress REST API integration would go here
-  return {
-    platform: 'wordpress',
-    status: 'published',
-    url: 'https://example.com/blog/demo-post',
-    postId: 'demo-post',
-    publishedAt: new Date().toISOString(),
-  };
-}
-
-async function publishToGhost(content: string, title?: string): Promise<PublishResult> {
-  // Ghost Admin API integration would go here
-  return {
-    platform: 'ghost',
-    status: 'published',
-    url: 'https://example.ghost.io/demo-post',
-    postId: 'demo-post',
-    publishedAt: new Date().toISOString(),
-  };
+    return {
+      platform: 'substack',
+      status: result.success ? 'published' : 'failed',
+      url: result.postUrl,
+      postId: result.postId,
+      publishedAt: result.success ? new Date().toISOString() : undefined,
+      error: result.error,
+    };
+  } catch (error) {
+    return {
+      platform: 'substack',
+      status: 'failed',
+      error: error instanceof Error ? error.message : 'Failed to publish to Substack',
+    };
+  }
 }
 
 const publishers: Record<PublishPlatform, (content: string, extra?: string) => Promise<PublishResult>> = {
-  facebook: publishToFacebook,
-  linkedin: publishToLinkedIn,
-  twitter: publishToTwitter,
-  medium: publishToMedium,
-  wordpress: publishToWordPress,
-  ghost: publishToGhost,
+  substack: publishToSubstack,
 };
 
 export async function POST(request: NextRequest) {

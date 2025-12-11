@@ -2,7 +2,7 @@
 // Publisher Types - Platform publishing interfaces
 // ============================================================================
 
-export type Platform = 'facebook' | 'linkedin' | 'medium' | 'wordpress';
+export type Platform = 'facebook' | 'linkedin' | 'medium' | 'wordpress' | 'substack';
 
 export interface PublishConfig {
   platform: Platform;
@@ -28,6 +28,11 @@ export interface PlatformSpecificOptions {
   wordpressStatus?: 'publish' | 'draft' | 'private';
   wordpressCategories?: number[];
   wordpressTags?: string[];
+
+  // Substack
+  substackPublicationUrl?: string;
+  substackAudience?: 'everyone' | 'paid' | 'founding';
+  substackSendEmail?: boolean;
 }
 
 export interface PublishResult {
@@ -56,6 +61,11 @@ export interface PlatformCredentials {
     siteUrl: string;
     username: string;
     applicationPassword: string;
+  };
+  substack?: {
+    email: string;
+    password: string;
+    publicationUrl: string;
   };
 }
 

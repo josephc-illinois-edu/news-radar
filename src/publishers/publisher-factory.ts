@@ -5,6 +5,7 @@
 import { Publisher, Platform } from '../types/publisher.js';
 import { FacebookPublisher } from './facebook-publisher.js';
 import { LinkedInPublisher } from './linkedin-publisher.js';
+import { SubstackPublisher } from './substack-publisher.js';
 
 export class PublisherFactory {
   static create(platform: Platform): Publisher {
@@ -13,6 +14,8 @@ export class PublisherFactory {
         return new FacebookPublisher();
       case 'linkedin':
         return new LinkedInPublisher();
+      case 'substack':
+        return new SubstackPublisher();
       case 'medium':
         throw new Error('Medium publisher not yet implemented');
       case 'wordpress':

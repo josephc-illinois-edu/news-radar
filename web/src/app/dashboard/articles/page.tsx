@@ -32,8 +32,9 @@ import {
 } from '@/components/ui/dialog';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ArticleFilters } from '@/components/articles/article-filters';
+import { SubstackStatusBadge, SubstackStatusIcon } from '@/components/articles/substack-status-badge';
 import { Trash2, Send, Archive, X } from 'lucide-react';
-import type { ArticleFilters as Filters } from '@/types/database';
+import type { ArticleFilters as Filters, DBArticleWithPublishedPosts } from '@/types/database';
 
 export default function ArticlesPage() {
   const [filters, setFilters] = useState<Filters>({
@@ -284,6 +285,10 @@ export default function ArticlesPage() {
                   )}
                   <div className="flex flex-wrap items-center gap-2 mt-2">
                     <StatusBadge status={article.status} />
+                    <SubstackStatusIcon
+                      article={article}
+                      publishedPosts={(article as DBArticleWithPublishedPosts).published_posts}
+                    />
                     {article.platform && (
                       <Badge variant="outline" className="capitalize text-xs">
                         {article.platform}
@@ -348,6 +353,7 @@ export default function ArticlesPage() {
               </TableHead>
               <TableHead className="w-[350px]">Title</TableHead>
               <TableHead>Status</TableHead>
+              <TableHead>Substack</TableHead>
               <TableHead>Platform</TableHead>
               <TableHead>Words</TableHead>
               <TableHead>Created</TableHead>
@@ -361,6 +367,7 @@ export default function ArticlesPage() {
                   <TableCell><Skeleton className="h-4 w-4" /></TableCell>
                   <TableCell><Skeleton className="h-4 w-[280px]" /></TableCell>
                   <TableCell><Skeleton className="h-4 w-[60px]" /></TableCell>
+                  <TableCell><Skeleton className="h-4 w-[90px]" /></TableCell>
                   <TableCell><Skeleton className="h-4 w-[80px]" /></TableCell>
                   <TableCell><Skeleton className="h-4 w-[40px]" /></TableCell>
                   <TableCell><Skeleton className="h-4 w-[80px]" /></TableCell>
@@ -369,7 +376,7 @@ export default function ArticlesPage() {
               ))
             ) : data?.data.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} className="h-24 text-center text-muted-foreground">
+                <TableCell colSpan={8} className="h-24 text-center text-muted-foreground">
                   No articles found. Create your first article to get started.
                 </TableCell>
               </TableRow>
@@ -398,6 +405,12 @@ export default function ArticlesPage() {
                   </TableCell>
                   <TableCell>
                     <StatusBadge status={article.status} />
+                  </TableCell>
+                  <TableCell>
+                    <SubstackStatusBadge
+                      article={article}
+                      publishedPosts={(article as DBArticleWithPublishedPosts).published_posts}
+                    />
                   </TableCell>
                   <TableCell>
                     {article.platform && (

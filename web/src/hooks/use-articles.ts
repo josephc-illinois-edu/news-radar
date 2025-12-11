@@ -143,3 +143,17 @@ export function usePublishArticle() {
     },
   });
 }
+
+export function useUpdateSubstack() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (id: string) =>
+      fetchJson<ApiResponse<{ substackUrl: string }>>(`${API_BASE}/${id}/update-substack`, {
+        method: 'POST',
+      }),
+    onSuccess: (_, id) => {
+      queryClient.invalidateQueries({ queryKey: articleKeys.detail(id) });
+    },
+  });
+}

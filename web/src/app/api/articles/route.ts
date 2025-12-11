@@ -85,7 +85,17 @@ export async function GET(request: NextRequest) {
 
     let query = supabase
       .from('articles')
-      .select('*', { count: 'exact' })
+      .select(`
+        *,
+        published_posts (
+          id,
+          platform,
+          status,
+          post_url,
+          published_at,
+          updated_at
+        )
+      `, { count: 'exact' })
       .order('created_at', { ascending: false });
 
     if (filters.status) {
