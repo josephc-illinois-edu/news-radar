@@ -1,25 +1,101 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useCallback, useState } from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Checkbox } from '@/components/ui/checkbox';
 import { useScannerDashboard, useTriggerScan } from '@/hooks/use-scanner';
 import { useArticleSelection } from '@/hooks/use-research';
-import type { TrendingTopic, SourceStat } from '@/types/scanner';
+import { useScannerConfig, useScannerPresets, useControlsCollapsed } from '@/hooks/use-scanner-config';
+import { useAutoRefresh } from '@/hooks/use-auto-refresh';
+import { useSaveToHistory } from '@/hooks/use-scan-history';
+import { ScanControls, RefreshIndicator, ScanProgress, ResultsTabs, StoriesTab, HistoryTab, PresetSelector } from '@/components/scanner';
+import type { TrendingTopic, SourceStat, ScanConfig } from '@/types/scanner';
 import type { StoryResult } from '@/types/research';
 
+const AUTO_REFRESH_INTERVAL = 60000; // 60 seconds
+
 export default function ScannerPage() {
-  const { data: dashboard, isLoading, error } = useScannerDashboard();
+  const { data: dashboard, isLoading, error, refetch, dataUpdatedAt } = useScannerDashboard();
   const triggerScan = useTriggerScan();
   const { selected, isSelected, toggleSelection, clearSelection, canAddMore } = useArticleSelection();
 
+  // Scan controls state
+  const { config, setConfig, updateConfig, toggleSource, addKeyword, removeKeyword, resetConfig, isHydrated: configHydrated } = useScannerConfig();
+  const { presets, activePresetId, savePreset, deletePreset, applyPreset, isHydrated: presetsHydrated } = useScannerPresets();
+  const { isCollapsed, setIsCollapsed, isHydrated: collapsedHydrated } = useControlsCollapsed();
+  const saveToHistory = useSaveToHistory();
+
+  // Track last refresh time
+  const [lastRefreshTime, setLastRefreshTime] = useState<string | null>(null);
+
+  // Results filtering
+  const [searchQuery, setSearchQuery] = useState('');
+
+  // Update last refresh time when data changes
+  useEffect(() => {
+    if (dataUpdatedAt) {
+      setLastRefreshTime(new Date(dataUpdatedAt).toISOString());
+    }
+  }, [dataUpdatedAt]);
+
+  // Smart auto-refresh (pauses when tab hidden)
+  const handleAutoRefresh = useCallback(() => {
+    refetch();
+  }, [refetch]);
+
+  const autoRefresh = useAutoRefresh({
+    intervalMs: AUTO_REFRESH_INTERVAL,
+    enabled: true,
+    onRefresh: handleAutoRefresh,
+  });
+
+  // Auto-collapse after first successful scan
+  useEffect(() => {
+    if (triggerScan.isSuccess && !isCollapsed) {
+      setIsCollapsed(true);
+    }
+  }, [triggerScan.isSuccess, isCollapsed, setIsCollapsed]);
+
   const handleScan = () => {
-    triggerScan.mutate({});
+    triggerScan.mutate(
+      {
+        sources: config.sources,
+        hoursBack: config.hoursBack,
+        limit: config.maxStoriesPerSource,
+      },
+      {
+        onSuccess: (result) => {
+          // Save scan to history
+          saveToHistory.mutate({
+            config,
+            topicsFound: result.topics?.length || 0,
+            storiesFound: result.stories?.length || 0,
+            topTopics: result.topics?.slice(0, 3).map((t) => t.name) || [],
+            errors: result.errors,
+          });
+        },
+      }
+    );
   };
+
+  // Handle applying preset
+  const handleApplyPreset = (preset: typeof presets[0]) => {
+    const newConfig = applyPreset(preset);
+    setConfig(newConfig);
+  };
+
+  // Handle applying config from history
+  const handleApplyHistoryConfig = (historyConfig: ScanConfig) => {
+    setConfig(historyConfig);
+  };
+
+  const handleManualRefresh = useCallback(() => {
+    refetch();
+    autoRefresh.refreshNow();
+  }, [refetch, autoRefresh]);
 
   if (isLoading) {
     return <ScannerSkeleton />;
@@ -37,20 +113,71 @@ export default function ScannerPage() {
     return null;
   }
 
+  // Wait for hydration to prevent mismatch
+  const isHydrated = configHydrated && collapsedHydrated && presetsHydrated;
+
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
+      {/* Header with refresh indicator */}
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold">Scanner</h1>
           <p className="text-muted-foreground">
             Monitor trending topics across news sources
           </p>
         </div>
-        <Button onClick={handleScan} disabled={triggerScan.isPending}>
-          {triggerScan.isPending ? 'Scanning...' : 'Scan Now'}
-        </Button>
+
+        <RefreshIndicator
+          lastRefreshTime={lastRefreshTime}
+          secondsUntilRefresh={autoRefresh.secondsUntilRefresh}
+          isEnabled={autoRefresh.isEnabled}
+          isPaused={autoRefresh.isPaused}
+          onToggleEnabled={autoRefresh.setEnabled}
+          onRefreshNow={handleManualRefresh}
+          isRefreshing={isLoading}
+        />
       </div>
+
+      {/* Scan Progress (shows during active scan) */}
+      {triggerScan.isPending && (
+        <ScanProgress
+          totalSources={config.sources.length}
+          completedSources={0}
+          currentSource={config.sources[0]}
+          isScanning={true}
+        />
+      )}
+
+      {/* Preset Selector */}
+      {isHydrated && (
+        <div className="flex items-center gap-4">
+          <PresetSelector
+            presets={presets}
+            activePresetId={activePresetId}
+            currentConfig={config}
+            onApplyPreset={handleApplyPreset}
+            onSavePreset={savePreset}
+            onDeletePreset={deletePreset}
+          />
+        </div>
+      )}
+
+      {/* Scan Controls Panel */}
+      {isHydrated && (
+        <ScanControls
+          config={config}
+          onConfigChange={updateConfig}
+          onToggleSource={toggleSource}
+          onAddKeyword={addKeyword}
+          onRemoveKeyword={removeKeyword}
+          onReset={resetConfig}
+          onScan={handleScan}
+          isScanning={triggerScan.isPending}
+          isCollapsed={isCollapsed}
+          onCollapsedChange={setIsCollapsed}
+          lastScanTime={dashboard?.lastScanTime}
+        />
+      )}
 
       {/* Stats Cards */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -102,26 +229,46 @@ export default function ScannerPage() {
         </Card>
       )}
 
-      <div className="grid gap-6 lg:grid-cols-3">
-        {/* Trending Topics */}
-        <div className="lg:col-span-2 space-y-4">
-          <h2 className="text-lg font-semibold">Trending Topics</h2>
-          {dashboard.trendingTopics.length === 0 ? (
-            <Card>
-              <CardContent className="py-8 text-center text-muted-foreground">
-                No trending topics detected. Try scanning for new stories.
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="space-y-3">
-              {dashboard.trendingTopics.map((topic) => (
-                <TrendingTopicCard key={topic.id} topic={topic} />
-              ))}
-            </div>
-          )}
+      {/* Results with Tabs */}
+      <div className="grid gap-6 lg:grid-cols-4">
+        <div className="lg:col-span-3">
+          <ResultsTabs
+            trendingCount={dashboard.trendingTopics.length}
+            storiesCount={dashboard.topStories.length}
+            searchValue={searchQuery}
+            onSearchChange={setSearchQuery}
+            trendingContent={
+              dashboard.trendingTopics.length === 0 ? (
+                <Card>
+                  <CardContent className="py-8 text-center text-muted-foreground">
+                    No trending topics detected. Try scanning for new stories.
+                  </CardContent>
+                </Card>
+              ) : (
+                <div className="space-y-3">
+                  {dashboard.trendingTopics.map((topic) => (
+                    <TrendingTopicCard key={topic.id} topic={topic} />
+                  ))}
+                </div>
+              )
+            }
+            storiesContent={
+              <StoriesTab
+                stories={dashboard.topStories}
+                searchQuery={searchQuery}
+                keywords={config.keywords}
+                isSelected={isSelected}
+                onToggleSelection={toggleSelection}
+                canSelect={(id) => canAddMore || isSelected(id)}
+              />
+            }
+            historyContent={
+              <HistoryTab onApplyConfig={handleApplyHistoryConfig} />
+            }
+          />
         </div>
 
-        {/* Source Stats */}
+        {/* Source Stats Sidebar */}
         <div className="space-y-4">
           <h2 className="text-lg font-semibold">Sources</h2>
           <div className="space-y-2">
@@ -129,27 +276,6 @@ export default function ScannerPage() {
               <SourceCard key={source.sourceId} source={source} />
             ))}
           </div>
-        </div>
-      </div>
-
-      {/* Recent Stories */}
-      <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold">Recent Stories</h2>
-          <span className="text-sm text-muted-foreground">
-            Sorted by engagement velocity
-          </span>
-        </div>
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {dashboard.topStories.map((story) => (
-            <StoryCard
-              key={story.id}
-              story={story}
-              isSelected={isSelected(story.id)}
-              onToggle={() => toggleSelection(story)}
-              canSelect={canAddMore || isSelected(story.id)}
-            />
-          ))}
         </div>
       </div>
     </div>
@@ -271,63 +397,6 @@ function SourceCard({ source }: { source: SourceStat }) {
                 Avg: {Math.round(source.avgEngagement)}
               </div>
             )}
-          </div>
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
-
-function StoryCard({
-  story,
-  isSelected,
-  onToggle,
-  canSelect,
-}: {
-  story: StoryResult;
-  isSelected: boolean;
-  onToggle: () => void;
-  canSelect: boolean;
-}) {
-  return (
-    <Card className={`transition-colors ${isSelected ? 'border-primary bg-primary/5' : 'hover:bg-accent/30'}`}>
-      <CardContent className="pt-4">
-        <div className="flex items-start gap-3">
-          <Checkbox
-            checked={isSelected}
-            onCheckedChange={onToggle}
-            disabled={!canSelect && !isSelected}
-            className="mt-1"
-          />
-          <div className="flex-1 min-w-0">
-            <a
-              href={story.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="font-medium hover:text-primary line-clamp-2"
-            >
-              {story.title}
-            </a>
-            <div className="flex items-center gap-2 mt-1">
-              <Badge variant="outline" className="text-xs">
-                {story.sourceName}
-              </Badge>
-              {story.engagementVelocity > 0 && (
-                <span className="text-xs text-muted-foreground">
-                  {Math.round(story.engagementVelocity)} velocity
-                </span>
-              )}
-            </div>
-            <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
-              {story.contentSnippet || 'No preview available'}
-            </p>
-            <div className="flex flex-wrap gap-1 mt-2">
-              {story.keywords.slice(0, 3).map((keyword) => (
-                <Badge key={keyword} variant="secondary" className="text-xs">
-                  {keyword}
-                </Badge>
-              ))}
-            </div>
           </div>
         </div>
       </CardContent>

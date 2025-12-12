@@ -82,6 +82,73 @@ export const DEFAULT_SCANNER_CONFIG: ScannerConfig = {
   maxStoriesPerSource: 20,
 };
 
+// === Scan Controls (Phase 1) ===
+
+/** User-configurable scan parameters */
+export interface ScanConfig {
+  sources: string[];           // Selected source slugs
+  hoursBack: number;           // 6, 12, 24, or 48
+  minScore: number;            // 0-100 engagement threshold
+  keywords: string[];          // Filter keywords
+  maxStoriesPerSource: number; // Limit per source
+}
+
+export const TIME_RANGE_OPTIONS = [6, 12, 24, 48] as const;
+export type TimeRange = typeof TIME_RANGE_OPTIONS[number];
+
+export const DEFAULT_SCAN_CONFIG: ScanConfig = {
+  sources: ['hackernews', 'lobsters', 'guardian'],
+  hoursBack: 24,
+  minScore: 0,
+  keywords: [],
+  maxStoriesPerSource: 20,
+};
+
+/** Saved scan configuration preset */
+export interface ScanPreset {
+  id: string;
+  name: string;
+  config: ScanConfig;
+  isDefault?: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** Default presets available to all users */
+export const BUILT_IN_PRESETS: Omit<ScanPreset, 'id' | 'createdAt' | 'updatedAt'>[] = [
+  {
+    name: 'Tech Focus',
+    config: {
+      sources: ['hackernews', 'lobsters', 'techcrunch', 'arstechnica'],
+      hoursBack: 24,
+      minScore: 50,
+      keywords: [],
+      maxStoriesPerSource: 20,
+    },
+    isDefault: true,
+  },
+  {
+    name: 'Breaking News',
+    config: {
+      sources: ['guardian', 'bbc', 'reuters', 'apnews'],
+      hoursBack: 6,
+      minScore: 0,
+      keywords: [],
+      maxStoriesPerSource: 30,
+    },
+  },
+  {
+    name: 'Science & Research',
+    config: {
+      sources: ['nature', 'science-daily', 'mit-tech-review'],
+      hoursBack: 48,
+      minScore: 0,
+      keywords: [],
+      maxStoriesPerSource: 20,
+    },
+  },
+];
+
 // === Scanner Dashboard ===
 
 export interface ScannerDashboard {

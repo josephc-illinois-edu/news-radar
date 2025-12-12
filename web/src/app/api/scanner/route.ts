@@ -1,7 +1,7 @@
 /**
  * Scanner API
- * GET /api/scanner - Get scanner dashboard data
- * POST /api/scanner - Run a scan with options
+ * GET /api/scanner - Get scanner dashboard data (performs initial scan or returns cached)
+ * POST /api/scanner - Run a scan with custom options
  */
 import { NextRequest, NextResponse } from 'next/server';
 import type { StoryResult } from '@/types/research';
@@ -13,129 +13,31 @@ import type {
   SourceStat,
   TopicCandidate,
 } from '@/types/scanner';
+import {
+  scanHackerNews,
+  scanLobsters,
+  scanAPNews,
+  scanReuters,
+  scanBBC,
+  scanGuardian,
+  scanNPR,
+  scanTechCrunch,
+  scanRSSFeed,
+} from '@/lib/scrapers';
 import { getEnabledSources, getSourceFeedUrls } from '@/lib/sources';
-import type { NewsSource } from '@/types/sources';
 
-// === Source Scanners (reused from research/scan) ===
+// === Scanner Map (shared pattern with research/scan) ===
 
-async function scanHackerNews(limit: number = 20, hoursBack: number = 24): Promise<StoryResult[]> {
-  const now = Math.floor(Date.now() / 1000);
-  const cutoffTime = now - (hoursBack * 60 * 60);
-
-  const url = `https://hn.algolia.com/api/v1/search?` +
-    `tags=story&` +
-    `numericFilters=points>50,created_at_i>${cutoffTime}&` +
-    `hitsPerPage=${limit}`;
-
-  const response = await fetch(url);
-  if (!response.ok) throw new Error('HN API failed');
-
-  const data = await response.json();
-
-  return data.hits.map((hit: any) => {
-    const createdAt = new Date(hit.created_at_i * 1000);
-    const ageHours = (Date.now() - createdAt.getTime()) / (1000 * 60 * 60);
-    const velocity = (hit.points + hit.num_comments * 2) / Math.max(ageHours, 0.1);
-
-    return {
-      id: `hn-${hit.objectID}`,
-      title: hit.title,
-      url: hit.url || `https://news.ycombinator.com/item?id=${hit.objectID}`,
-      contentSnippet: hit.story_text || '',
-      publishedAt: createdAt.toISOString(),
-      score: hit.points,
-      commentCount: hit.num_comments,
-      engagementVelocity: velocity,
-      keywords: extractKeywords(hit.title),
-      topics: ['technology'],
-      sourceId: 'hackernews',
-      sourceName: 'HackerNews',
-      detectedAt: new Date().toISOString(),
-      status: 'flagged' as const,
-    };
-  });
-}
-
-async function scanLobsters(limit: number = 20): Promise<StoryResult[]> {
-  const response = await fetch('https://lobste.rs/hottest.json');
-  if (!response.ok) throw new Error('Lobsters API failed');
-
-  const stories = await response.json();
-
-  return stories.slice(0, limit).map((story: any) => {
-    const createdAt = new Date(story.created_at);
-    const ageHours = (Date.now() - createdAt.getTime()) / (1000 * 60 * 60);
-    const velocity = (story.score + story.comment_count * 2) / Math.max(ageHours, 0.1);
-
-    return {
-      id: `lobsters-${story.short_id}`,
-      title: story.title,
-      url: story.url || story.short_id_url,
-      contentSnippet: story.description || '',
-      publishedAt: createdAt.toISOString(),
-      score: story.score,
-      commentCount: story.comment_count,
-      engagementVelocity: velocity,
-      keywords: story.tags || [],
-      topics: ['technology'],
-      sourceId: 'lobsters',
-      sourceName: 'Lobsters',
-      detectedAt: new Date().toISOString(),
-      status: 'flagged' as const,
-    };
-  });
-}
-
-
-// === RSS Parsing ===
-
-function parseRSS(xml: string, limit: number): Array<{ title: string; link: string; description: string; pubDate: string }> {
-  const items: Array<{ title: string; link: string; description: string; pubDate: string }> = [];
-  const itemRegex = /<item>([\s\S]*?)<\/item>/g;
-  let match;
-
-  while ((match = itemRegex.exec(xml)) !== null && items.length < limit) {
-    const itemXml = match[1];
-    const title = extractXmlContent(itemXml, 'title');
-    const link = extractXmlContent(itemXml, 'link');
-    const description = extractXmlContent(itemXml, 'description');
-    const pubDate = extractXmlContent(itemXml, 'pubDate');
-
-    items.push({
-      title: cleanCDATA(title),
-      link,
-      description: cleanCDATA(description).replace(/<[^>]+>/g, '').slice(0, 300),
-      pubDate: pubDate ? new Date(pubDate).toISOString() : new Date().toISOString(),
-    });
-  }
-
-  return items;
-}
-
-function extractXmlContent(xml: string, tag: string): string {
-  const cdataRegex = new RegExp(`<${tag}><![CDATA[(.*?)]]></${tag}>`, 's');
-  const simpleRegex = new RegExp(`<${tag}>(.*?)</${tag}>`, 's');
-
-  const cdataMatch = xml.match(cdataRegex);
-  if (cdataMatch) return cdataMatch[1];
-
-  const simpleMatch = xml.match(simpleRegex);
-  return simpleMatch ? simpleMatch[1] : '';
-}
-
-function cleanCDATA(text: string): string {
-  return text.replace(/<!\[CDATA\[|\]\]>/g, '').trim();
-}
-
-function extractKeywords(title: string): string[] {
-  const stopWords = new Set(['the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by', 'from', 'is', 'are', 'was', 'were', 'be', 'been', 'being', 'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'could', 'should', 'may', 'might', 'must', 'shall', 'can', 'need', 'dare', 'ought', 'used', 'this', 'that', 'these', 'those', 'it', 'its']);
-  return title
-    .toLowerCase()
-    .replace(/[^\w\s]/g, '')
-    .split(/\s+/)
-    .filter(word => word.length > 3 && !stopWords.has(word))
-    .slice(0, 8);
-}
+const SCANNER_MAP: Record<string, (limit: number, hoursBack?: number, minScore?: number) => Promise<StoryResult[]>> = {
+  hackernews: scanHackerNews,
+  lobsters: scanLobsters,
+  apnews: scanAPNews,
+  reuters: scanReuters,
+  bbc: scanBBC,
+  guardian: scanGuardian,
+  npr: scanNPR,
+  techcrunch: scanTechCrunch,
+};
 
 // === Topic Extraction ===
 
@@ -143,7 +45,6 @@ function extractTopics(stories: StoryResult[], totalSources: number = 3): Trendi
   const topicMap = new Map<string, TopicCandidate>();
 
   for (const story of stories) {
-    // Extract from keywords
     for (const keyword of story.keywords) {
       const normalized = keyword.toLowerCase().trim();
       if (normalized.length < 3) continue;
@@ -173,12 +74,11 @@ function extractTopics(stories: StoryResult[], totalSources: number = 3): Trendi
   return Array.from(topicMap.values())
     .filter(t => t.mentionCount >= 2)
     .map(t => {
-      const score = calculateTrendingScoreInternal(
+      const score = calculateTrendingScore(
         t.mentionCount,
         t.sourceIds.size,
         t.avgVelocity,
-        totalSources,
-        0 // AI score added later
+        totalSources
       );
 
       return {
@@ -202,17 +102,16 @@ function extractTopics(stories: StoryResult[], totalSources: number = 3): Trendi
     .slice(0, 20);
 }
 
-function calculateTrendingScoreInternal(
+function calculateTrendingScore(
   mentionCount: number,
   sourceCount: number,
   avgVelocity: number,
-  totalSources: number,
-  aiScore: number = 0
+  totalSources: number
 ): { total: number; components: { frequency: number; sourceSpread: number; velocity: number; aiPrediction: number } } {
   const frequency = Math.min(25, (mentionCount / 10) * 25);
   const sourceSpread = (sourceCount / Math.max(totalSources, 1)) * 25;
   const velocity = Math.min(25, (avgVelocity / 500) * 25);
-  const aiPrediction = Math.min(25, (aiScore / 100) * 25);
+  const aiPrediction = 0;
 
   return {
     total: Math.round(frequency + sourceSpread + velocity + aiPrediction),
@@ -225,60 +124,80 @@ function calculateTrendingScoreInternal(
   };
 }
 
-// === Scan Sources from DB ===
+// === Unified Scan Function ===
 
-async function scanSourcesFromDB(request: ScanRequest): Promise<ScanResponse> {
-  const { hoursBack = 24, limit = 20 } = request;
+async function scanSources(request: ScanRequest): Promise<ScanResponse> {
+  const { sources, hoursBack = 24, limit = 20 } = request;
 
-  // Get enabled sources from database
-  const enabledSources = await getEnabledSources();
+  // Get enabled sources from DB if not specified
+  let sourcesToScan = sources;
+  if (!sourcesToScan || sourcesToScan.length === 0) {
+    const enabledSources = await getEnabledSources();
+    sourcesToScan = enabledSources.map(s => s.slug);
+  }
+
+  // Get DB sources for RSS feed URLs
+  const dbSources = await getEnabledSources();
+  const dbSourceMap = new Map(dbSources.map(s => [s.slug, s]));
 
   const allStories: StoryResult[] = [];
   const sourceStats: SourceStat[] = [];
   const errors: string[] = [];
 
-  // Scan each enabled source
-  for (const source of enabledSources) {
+  // Scan each source
+  for (const sourceSlug of sourcesToScan) {
     try {
       let stories: StoryResult[] = [];
 
-      // Handle different source types
-      if (source.source_type === 'api') {
-        switch (source.slug) {
-          case 'hackernews':
-            stories = await scanHackerNews(limit, hoursBack);
-            break;
-          case 'lobsters':
-            stories = await scanLobsters(limit);
-            break;
-          default:
-            console.log(`API source ${source.slug} not implemented`);
-        }
-      } else if (source.source_type === 'rss') {
-        const feedUrls = getSourceFeedUrls(source);
-        for (const feedUrl of feedUrls) {
-          const feedStories = await scanRSSFeedWithMeta(feedUrl, source.slug, source.name, limit);
-          stories.push(...feedStories);
+      // Check for dedicated scanner
+      const scanner = SCANNER_MAP[sourceSlug];
+      if (scanner) {
+        stories = await scanner(limit, hoursBack);
+      } else {
+        // Try RSS scanner with DB config
+        const dbSource = dbSourceMap.get(sourceSlug);
+        if (dbSource && dbSource.source_type === 'rss') {
+          const feedUrls = getSourceFeedUrls(dbSource);
+          for (const feedUrl of feedUrls) {
+            const feedStories = await scanRSSFeed(
+              feedUrl,
+              dbSource.slug,
+              dbSource.name,
+              limit,
+              dbSource.category
+            );
+            stories.push(...feedStories);
+          }
+        } else {
+          console.log(`[Scanner] Source ${sourceSlug} not supported`);
         }
       }
 
       allStories.push(...stories);
 
+      const dbSource = dbSourceMap.get(sourceSlug);
       sourceStats.push({
-        sourceId: source.slug,
-        sourceName: source.name,
+        sourceId: sourceSlug,
+        sourceName: dbSource?.name || sourceSlug,
         storiesFound: stories.length,
-        avgEngagement: stories.reduce((sum, s) => sum + s.engagementVelocity, 0) / Math.max(stories.length, 1),
+        avgEngagement: stories.length > 0
+          ? stories.reduce((sum, s) => sum + s.engagementVelocity, 0) / stories.length
+          : 0,
         lastSuccess: new Date().toISOString(),
         errorCount: 0,
       });
+
+      console.log(`[Scanner] ${sourceSlug}: ${stories.length} stories`);
+
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unknown error';
-      errors.push(`${source.name}: ${message}`);
+      console.error(`[Scanner] ${sourceSlug} failed:`, message);
+      errors.push(`${sourceSlug}: ${message}`);
 
+      const dbSource = dbSourceMap.get(sourceSlug);
       sourceStats.push({
-        sourceId: source.slug,
-        sourceName: source.name,
+        sourceId: sourceSlug,
+        sourceName: dbSource?.name || sourceSlug,
         storiesFound: 0,
         avgEngagement: 0,
         lastError: message,
@@ -287,11 +206,11 @@ async function scanSourcesFromDB(request: ScanRequest): Promise<ScanResponse> {
     }
   }
 
-  // Sort stories by engagement velocity
+  // Sort by engagement velocity
   allStories.sort((a, b) => b.engagementVelocity - a.engagementVelocity);
 
   // Extract trending topics
-  const topics = extractTopics(allStories, enabledSources.length);
+  const topics = extractTopics(allStories, sourcesToScan.length);
 
   return {
     stories: allStories,
@@ -303,120 +222,55 @@ async function scanSourcesFromDB(request: ScanRequest): Promise<ScanResponse> {
   };
 }
 
-// RSS feed scanner with metadata
-async function scanRSSFeedWithMeta(
-  feedUrl: string,
-  sourceId: string,
-  sourceName: string,
-  limit: number = 20
-): Promise<StoryResult[]> {
-  try {
-    const response = await fetch(feedUrl);
-    if (!response.ok) throw new Error(`RSS fetch failed: ${response.status}`);
+// === In-memory cache for scan results ===
 
-    const text = await response.text();
-    const items = parseRSS(text, limit);
+let cachedScanResult: ScanResponse | null = null;
+let lastScanTime: string | null = null;
 
-    return items.map((item, i) => ({
-      id: `${sourceId}-${i}-${Date.now()}`,
-      title: item.title,
-      url: item.link,
-      contentSnippet: item.description,
-      publishedAt: item.pubDate,
-      score: 0,
-      commentCount: 0,
-      engagementVelocity: 0,
-      keywords: extractKeywords(item.title),
-      topics: ['news'],
-      sourceId,
-      sourceName,
-      detectedAt: new Date().toISOString(),
-      status: 'flagged' as const,
-    }));
-  } catch (error) {
-    console.error(`RSS scan failed for ${feedUrl}:`, error);
-    return [];
-  }
-}
-
-// === Demo Dashboard (uses enabled sources from DB) ===
+// === Dashboard Generation ===
 
 async function generateDashboard(): Promise<ScannerDashboard> {
-  const now = new Date();
-  const enabledSources = await getEnabledSources();
+  // If we have cached scan results, use them
+  if (cachedScanResult && lastScanTime) {
+    return {
+      lastScanTime,
+      totalStoriesScanned: cachedScanResult.totalFound,
+      trendingTopics: cachedScanResult.topics,
+      topStories: cachedScanResult.stories.slice(0, 20),
+      sourceStats: cachedScanResult.sourceStats,
+      recentScans: [
+        {
+          id: `scan-${Date.now()}`,
+          timestamp: lastScanTime,
+          sourcesScanned: cachedScanResult.sourceStats.map(s => s.sourceId),
+          storiesFound: cachedScanResult.totalFound,
+          newTopics: cachedScanResult.topics.length,
+          durationMs: 0,
+        },
+      ],
+    };
+  }
+
+  // No cached results - perform initial scan
+  console.log('[Scanner] No cached results, performing initial scan...');
+  const initialScan = await scanSources({ hoursBack: 24, limit: 20 });
+  cachedScanResult = initialScan;
+  lastScanTime = initialScan.scanTime;
 
   return {
-    lastScanTime: new Date(now.getTime() - 5 * 60 * 1000).toISOString(),
-    totalStoriesScanned: 127,
-    trendingTopics: [
-      {
-        id: 'topic-ai-demo',
-        name: 'artificial intelligence',
-        slug: 'artificial-intelligence',
-        frequency: 23,
-        sourceCount: 4,
-        firstSeen: new Date(now.getTime() - 6 * 60 * 60 * 1000).toISOString(),
-        lastSeen: now.toISOString(),
-        trendScore: 78,
-        velocityScore: 18,
-        aiPredictionScore: 22,
-        aiPredictionReason: 'High cross-source coverage with accelerating engagement',
-        relatedStories: ['hn-1', 'hn-2', 'lobsters-1'],
-        relatedKeywords: ['machine learning', 'gpt', 'llm'],
-        peakHour: 14,
-      },
-      {
-        id: 'topic-climate-demo',
-        name: 'climate change',
-        slug: 'climate-change',
-        frequency: 15,
-        sourceCount: 3,
-        firstSeen: new Date(now.getTime() - 8 * 60 * 60 * 1000).toISOString(),
-        lastSeen: now.toISOString(),
-        trendScore: 62,
-        velocityScore: 14,
-        aiPredictionScore: 18,
-        aiPredictionReason: 'Recurring topic with policy implications',
-        relatedStories: ['guardian-1', 'guardian-2'],
-        relatedKeywords: ['environment', 'carbon', 'renewable'],
-        peakHour: 10,
-      },
-    ],
-    topStories: [
-      {
-        id: 'demo-hn-1',
-        title: 'OpenAI Announces New Model with Improved Reasoning',
-        url: 'https://example.com/openai-new-model',
-        contentSnippet: 'OpenAI has released a new AI model that demonstrates significant improvements in logical reasoning...',
-        publishedAt: new Date(now.getTime() - 2 * 60 * 60 * 1000).toISOString(),
-        score: 856,
-        commentCount: 423,
-        engagementVelocity: 285,
-        keywords: ['openai', 'artificial', 'intelligence', 'reasoning'],
-        topics: ['technology'],
-        sourceId: 'hackernews',
-        sourceName: 'Hacker News',
-        detectedAt: now.toISOString(),
-        status: 'flagged',
-      },
-    ],
-    // Generate stats from enabled sources
-    sourceStats: enabledSources.map(source => ({
-      sourceId: source.slug,
-      sourceName: source.name,
-      storiesFound: Math.floor(Math.random() * 50) + 10,
-      avgEngagement: source.source_type === 'api' ? Math.random() * 100 : 0,
-      lastSuccess: now.toISOString(),
-      errorCount: 0,
-    })),
+    lastScanTime: initialScan.scanTime,
+    totalStoriesScanned: initialScan.totalFound,
+    trendingTopics: initialScan.topics,
+    topStories: initialScan.stories.slice(0, 20),
+    sourceStats: initialScan.sourceStats,
     recentScans: [
       {
-        id: 'scan-1',
-        timestamp: new Date(now.getTime() - 5 * 60 * 1000).toISOString(),
-        sourcesScanned: enabledSources.map(s => s.slug),
-        storiesFound: 127,
-        newTopics: 3,
-        durationMs: 2340,
+        id: `scan-${Date.now()}`,
+        timestamp: initialScan.scanTime,
+        sourcesScanned: initialScan.sourceStats.map(s => s.sourceId),
+        storiesFound: initialScan.totalFound,
+        newTopics: initialScan.topics.length,
+        durationMs: 0,
       },
     ],
   };
@@ -440,7 +294,14 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     const body: ScanRequest = await request.json();
-    const result = await scanSourcesFromDB(body);
+    console.log('[Scanner] POST scan with config:', body);
+
+    const result = await scanSources(body);
+
+    // Update cache with new scan results
+    cachedScanResult = result;
+    lastScanTime = result.scanTime;
+
     return NextResponse.json(result);
   } catch (error) {
     console.error('Scanner POST error:', error);

@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { useScanSources, useArticleSelection } from '@/hooks/use-research';
 import { Button } from '@/components/ui/button';
@@ -22,7 +23,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from '@/components/ui/collapsible';
-import { Search, Filter, ChevronDown } from 'lucide-react';
+import { Search, Filter, ChevronDown, X } from 'lucide-react';
 import { AVAILABLE_SOURCES, type StoryResult, type SourceId } from '@/types/research';
 
 // Filter types
@@ -40,11 +41,18 @@ const DEFAULT_FILTERS: ResultFilters = {
   hoursBack: 24,
 };
 
+// Default sources to scan when coming from a topic
+const DEFAULT_TOPIC_SOURCES: SourceId[] = ['hackernews', 'lobsters', 'guardian', 'bbc'];
+
 export default function ResearchPage() {
+  const searchParams = useSearchParams();
+  const topicFromUrl = searchParams.get('topic');
+
   const [selectedSources, setSelectedSources] = useState<SourceId[]>(['hackernews']);
   const [results, setResults] = useState<StoryResult[]>([]);
   const [filters, setFilters] = useState<ResultFilters>(DEFAULT_FILTERS);
   const [showFilters, setShowFilters] = useState(false);
+  const [hasAutoScanned, setHasAutoScanned] = useState(false);
   const scanMutation = useScanSources();
   const {
     selected: selectedArticles,
@@ -54,6 +62,35 @@ export default function ResearchPage() {
     canAddMore,
   } = useArticleSelection();
 
+  // Handle topic from URL (e.g., from Scanner "Research More")
+  // Combined effect to set up and auto-scan
+  useEffect(() => {
+    if (topicFromUrl && !hasAutoScanned) {
+      // Set the keyword filter to the topic
+      setFilters(f => ({ ...f, keyword: topicFromUrl }));
+      // Select multiple sources for broader coverage
+      setSelectedSources(DEFAULT_TOPIC_SOURCES);
+      // Mark as scanned and trigger scan
+      setHasAutoScanned(true);
+
+      // Trigger scan with the topic keyword
+      scanMutation.mutate(
+        {
+          sources: DEFAULT_TOPIC_SOURCES,
+          limit: 50,
+          hoursBack: 24,
+          keywords: [topicFromUrl.toLowerCase()],
+          requireKeywordMatch: true,
+        },
+        {
+          onSuccess: (result) => {
+            setResults(result.stories);
+          },
+        }
+      );
+    }
+  }, [topicFromUrl, hasAutoScanned]);
+
   const toggleSource = (sourceId: SourceId) => {
     setSelectedSources((prev) =>
       prev.includes(sourceId)
@@ -62,16 +99,26 @@ export default function ResearchPage() {
     );
   };
 
-  const handleScan = async () => {
+  // Scan with optional keyword filtering (server-side)
+  const handleScanWithKeywords = async (keyword?: string) => {
     if (selectedSources.length === 0) return;
+
+    const keywords = keyword ? [keyword.toLowerCase()] :
+      filters.keyword.trim() ? [filters.keyword.toLowerCase()] : [];
 
     const result = await scanMutation.mutateAsync({
       sources: selectedSources,
-      limit: 50, // Get more results, filter client-side
+      limit: 50,
       hoursBack: filters.hoursBack,
+      keywords,
+      requireKeywordMatch: keywords.length > 0, // Only require match if we have keywords
     });
 
     setResults(result.stories);
+  };
+
+  const handleScan = async () => {
+    await handleScanWithKeywords();
   };
 
   // Filter and sort results
@@ -108,12 +155,46 @@ export default function ResearchPage() {
   const techSources = AVAILABLE_SOURCES.filter((s) => s.category === 'tech');
   const newsSources = AVAILABLE_SOURCES.filter((s) => s.category === 'news');
 
+  // Clear topic and reset
+  const clearTopic = () => {
+    setFilters(f => ({ ...f, keyword: '' }));
+    setResults([]);
+    setHasAutoScanned(false);
+    // Update URL without the topic param
+    window.history.replaceState({}, '', '/dashboard/research');
+  };
+
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold">Research</h1>
-        <p className="text-muted-foreground">Scan sources for trending stories</p>
+        <p className="text-muted-foreground">
+          {topicFromUrl
+            ? `Researching stories about "${topicFromUrl}"`
+            : 'Scan sources for trending stories'}
+        </p>
       </div>
+
+      {/* Topic indicator from Scanner */}
+      {topicFromUrl && (
+        <Card className="bg-primary/5 border-primary/20">
+          <CardContent className="py-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Badge variant="default">Topic</Badge>
+                <span className="font-medium">{topicFromUrl}</span>
+                <span className="text-sm text-muted-foreground">
+                  from Scanner
+                </span>
+              </div>
+              <Button variant="ghost" size="sm" onClick={clearTopic}>
+                <X className="h-4 w-4 mr-1" />
+                Clear
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Source Selection */}
       <Card>

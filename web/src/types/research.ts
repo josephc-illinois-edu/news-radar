@@ -24,6 +24,8 @@ export interface ScanOptions {
   limit?: number;
   hoursBack?: number;
   minScore?: number;
+  keywords?: string[];          // Filter results by these keywords
+  requireKeywordMatch?: boolean; // If true, only return articles matching keywords
 }
 
 export interface ScanResult {
