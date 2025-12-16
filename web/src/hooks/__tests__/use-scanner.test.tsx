@@ -93,27 +93,37 @@ Object.defineProperty(window, 'localStorage', { value: localStorageMock });
 // ============================================================================
 
 const mockDashboard: ScannerDashboard = {
-  sources: [
+  lastScanTime: new Date().toISOString(),
+  totalStoriesScanned: 100,
+  trendingTopics: [],
+  topStories: [],
+  sourceStats: [
     {
-      id: 'hackernews',
-      name: 'Hacker News',
-      stories: [],
-      lastScanned: new Date().toISOString(),
-      enabled: true,
+      sourceId: 'hackernews',
+      sourceName: 'Hacker News',
+      storiesFound: 25,
+      avgEngagement: 150,
+      lastSuccess: new Date().toISOString(),
+      errorCount: 0,
     },
   ],
-  trending: [],
-  lastUpdated: new Date().toISOString(),
-  demo: false,
+  recentScans: [],
 };
 
 const mockTrendingTopics: TrendingTopic[] = [
   {
     id: 'topic-1',
     name: 'AI Safety',
-    score: 95,
-    sources: ['hackernews', 'lobsters'],
-    storyCount: 12,
+    slug: 'ai-safety',
+    frequency: 15,
+    sourceCount: 2,
+    firstSeen: new Date().toISOString(),
+    lastSeen: new Date().toISOString(),
+    trendScore: 95,
+    velocityScore: 80,
+    aiPredictionScore: 75,
+    relatedStories: ['story-1', 'story-2'],
+    relatedKeywords: ['artificial intelligence', 'machine learning'],
   },
 ];
 
@@ -121,9 +131,11 @@ const mockRSSFeed: RSSFeed = {
   id: 'feed-1',
   url: 'https://example.com/feed.xml',
   name: 'Example Feed',
+  category: 'tech',
   enabled: true,
-  lastFetched: new Date().toISOString(),
-  itemCount: 25,
+  lastScanned: new Date().toISOString(),
+  errorCount: 0,
+  createdAt: new Date().toISOString(),
 };
 
 // ============================================================================
@@ -283,7 +295,7 @@ describe('useTriggerScan', () => {
       wrapper: createWrapper(),
     });
 
-    result.current.mutate();
+    result.current.mutate({});
 
     await waitFor(() => {
       expect(result.current.isSuccess).toBe(true);
@@ -306,7 +318,7 @@ describe('useTriggerScan', () => {
       wrapper: createWrapper(),
     });
 
-    result.current.mutate({ sources: ['hackernews'], hours: 24 });
+    result.current.mutate({ sources: ['hackernews'], hoursBack: 24 });
 
     await waitFor(() => {
       expect(result.current.isSuccess).toBe(true);
@@ -315,7 +327,7 @@ describe('useTriggerScan', () => {
     expect(mockFetch).toHaveBeenCalledWith('/api/scanner', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ sources: ['hackernews'], hours: 24 }),
+      body: JSON.stringify({ sources: ['hackernews'], hoursBack: 24 }),
     });
   });
 
@@ -329,7 +341,7 @@ describe('useTriggerScan', () => {
       wrapper: createWrapper(),
     });
 
-    result.current.mutate();
+    result.current.mutate({});
 
     await waitFor(() => {
       expect(result.current.isError).toBe(true);
@@ -381,7 +393,7 @@ describe('useAddRSSFeed', () => {
       wrapper: createWrapper(),
     });
 
-    result.current.mutate({ url: 'https://example.com/feed.xml', name: 'Example' });
+    result.current.mutate({ url: 'https://example.com/feed.xml', name: 'Example', category: 'tech' });
 
     await waitFor(() => {
       expect(result.current.isSuccess).toBe(true);
@@ -390,7 +402,7 @@ describe('useAddRSSFeed', () => {
     expect(mockFetch).toHaveBeenCalledWith('/api/scanner/feeds', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ url: 'https://example.com/feed.xml', name: 'Example' }),
+      body: JSON.stringify({ url: 'https://example.com/feed.xml', name: 'Example', category: 'tech' }),
     });
   });
 });
