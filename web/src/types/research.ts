@@ -38,6 +38,7 @@ export interface ScanResult {
 export const AVAILABLE_SOURCES = [
   { id: 'hackernews', name: 'HackerNews', icon: 'Y', category: 'tech' },
   { id: 'lobsters', name: 'Lobsters', icon: '🦞', category: 'tech' },
+  { id: 'producthunt', name: 'Product Hunt', icon: '🚀', category: 'tech' },
   { id: 'guardian', name: 'The Guardian', icon: '📰', category: 'news' },
   { id: 'bbc', name: 'BBC News', icon: '📺', category: 'news' },
   { id: 'reuters', name: 'Reuters', icon: '📡', category: 'news' },

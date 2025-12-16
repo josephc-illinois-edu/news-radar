@@ -53,20 +53,30 @@ async function publishToSubstack(content: string, title?: string): Promise<Publi
   }
 }
 
-const publishers: Record<PublishPlatform, (content: string, extra?: string) => Promise<PublishResult>> = {
+// Only substack is currently implemented - other platforms return not-implemented error
+const publishers: Partial<Record<PublishPlatform, (content: string, extra?: string) => Promise<PublishResult>>> = {
   substack: publishToSubstack,
 };
+
+async function notImplementedPublisher(platform: PublishPlatform): Promise<PublishResult> {
+  return {
+    platform,
+    status: 'failed',
+    error: `${platform} publishing is not yet implemented`,
+  };
+}
 
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient();
+    let userId: string | undefined;
 
     // Check auth if Supabase is configured
     if (supabase) {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-      }
+      userId = user?.id;
+      // Allow publishing without auth for now - user can still publish
+      // but we won't track user_id on published_posts
     }
 
     const body: PublishRequest = await request.json();
@@ -105,7 +115,6 @@ export async function POST(request: NextRequest) {
 
       // Save scheduled posts if Supabase is configured
       if (supabase) {
-        const { data: { user } } = await supabase.auth.getUser();
         const scheduledPosts = body.platforms.map(platform => ({
           article_id: body.articleId,
           platform,
@@ -113,7 +122,7 @@ export async function POST(request: NextRequest) {
           scheduled_at: body.scheduledAt,
           content: body.customContent?.[platform] || article.content,
           image_url: body.imageUrl,
-          user_id: user?.id,
+          user_id: userId,
         }));
 
         const { data: savedPosts, error: saveError } = await supabase
@@ -148,20 +157,21 @@ export async function POST(request: NextRequest) {
       try {
         const content = body.customContent?.[platform] || article.content;
         const publisher = publishers[platform];
-        const result = await publisher(content, article.title);
+        const result = publisher
+          ? await publisher(content, article.title)
+          : await notImplementedPublisher(platform);
         results.push(result);
 
         // Save the published post record if Supabase is configured
         if (supabase) {
-          const { data: { user } } = await supabase.auth.getUser();
           await supabase.from('published_posts').insert({
             article_id: body.articleId,
             platform,
             status: result.status,
-            url: result.url,
-            post_id: result.postId,
+            post_url: result.url,
+            external_post_id: result.postId,
             published_at: result.publishedAt,
-            user_id: user?.id,
+            user_id: userId,
           });
         }
       } catch (err) {
@@ -202,18 +212,17 @@ export async function GET(request: NextRequest) {
     }
 
     const { data: { user } } = await supabase.auth.getUser();
-
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
     const articleId = request.nextUrl.searchParams.get('articleId');
 
     let query = supabase
       .from('published_posts')
       .select('*')
-      .eq('user_id', user.id)
       .order('created_at', { ascending: false });
+
+    // Filter by user if authenticated
+    if (user) {
+      query = query.eq('user_id', user.id);
+    }
 
     if (articleId) {
       query = query.eq('article_id', articleId);

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { useScanSources, useArticleSelection } from '@/hooks/use-research';
@@ -44,7 +44,39 @@ const DEFAULT_FILTERS: ResultFilters = {
 // Default sources to scan when coming from a topic
 const DEFAULT_TOPIC_SOURCES: SourceId[] = ['hackernews', 'lobsters', 'guardian', 'bbc'];
 
+// Wrap in Suspense to satisfy Next.js 16 requirements for useSearchParams
 export default function ResearchPage() {
+  return (
+    <Suspense fallback={<ResearchPageSkeleton />}>
+      <ResearchPageContent />
+    </Suspense>
+  );
+}
+
+function ResearchPageSkeleton() {
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <Skeleton className="h-8 w-32" />
+          <Skeleton className="h-4 w-64 mt-2" />
+        </div>
+      </div>
+      <div className="grid gap-4">
+        {[1, 2, 3].map(i => (
+          <Card key={i}>
+            <CardContent className="p-6">
+              <Skeleton className="h-6 w-3/4" />
+              <Skeleton className="h-4 w-full mt-2" />
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function ResearchPageContent() {
   const searchParams = useSearchParams();
   const topicFromUrl = searchParams.get('topic');
 

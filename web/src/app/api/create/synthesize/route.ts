@@ -20,6 +20,7 @@ import type {
   FactPoint,
   Contradiction,
 } from '@/types/synthesis';
+import { getBannedPhrasesPrompt } from '@/lib/ai-prompts';
 
 export async function POST(request: NextRequest): Promise<NextResponse<SynthesizeResponse>> {
   try {
@@ -131,23 +132,37 @@ Source ${i + 1}: "${story.title}"
     ? `\nFocus Area: ${context.focus}`
     : '';
 
-  return `You are a research analyst helping a journalist synthesize multiple news sources into original content.
+  const bannedPhrases = getBannedPhrasesPrompt();
 
-Analyze these ${context.stories.length} sources and provide synthesis:
+  return `You're helping a writer find genuinely interesting angles across these sources.
 
+SOURCES:
 ${storySummaries}
 ${notesSection}
 ${analysisSection}
 ${focusSection}
 
-Produce a JSON response with this exact structure:
+When suggesting angles, avoid generic takes. Bad examples:
+- "A balanced look at X" - too vague
+- "The implications of Y" - what implications specifically?
+- "What this means for Z" - cliché
+
+Good angle examples:
+- "The specific number that undermines the official narrative"
+- "Why Source A and Source B can both be right"
+- "The question nobody is asking about X"
+- "What the comment section reveals that the articles miss"
+
+${bannedPhrases}
+
+OUTPUT FORMAT (JSON):
 {
   "themes": [
     {
-      "name": "theme name",
-      "description": "what this theme covers",
+      "name": "specific theme name",
+      "description": "concrete description",
       "frequency": 1-5,
-      "sources": ["source names that cover this"],
+      "sources": ["source names"],
       "sentiment": "positive|negative|neutral|mixed"
     }
   ],
@@ -155,50 +170,51 @@ Produce a JSON response with this exact structure:
     {
       "sourceId": "story id",
       "sourceName": "source name",
-      "stance": "how this source frames the topic",
-      "keyPoints": ["main arguments or claims"],
+      "stance": "specific framing or angle this source takes",
+      "keyPoints": ["concrete claims, not vague summaries"],
       "bias": "left|center|right|unknown",
-      "credibilityIndicators": ["what makes this source credible or not"]
+      "credibilityIndicators": ["specific credibility signals"]
     }
   ],
   "suggestedAngles": [
     {
       "id": "unique-id",
-      "name": "angle name",
-      "thesis": "the central argument",
-      "description": "what makes this angle interesting",
-      "supportingPoints": ["evidence that supports this angle"],
-      "counterpoints": ["potential objections or alternative views"],
+      "name": "specific, punchy angle name",
+      "thesis": "one clear argument in one sentence",
+      "description": "why this is interesting - be specific",
+      "supportingPoints": ["concrete evidence from sources"],
+      "counterpoints": ["real objections, not strawmen"],
       "originalityScore": 0-100,
       "riskLevel": "safe|moderate|provocative",
-      "targetAudience": "who this would resonate with",
+      "targetAudience": "specific reader type",
       "suggestedTone": "informative|analytical|persuasive|entertaining"
     }
   ],
   "factSummary": {
     "agreedFacts": [
-      { "claim": "fact text", "sources": ["source names"], "confidence": "high|medium|low", "category": "statistic|quote|event|opinion|prediction" }
+      { "claim": "specific fact", "sources": ["source names"], "confidence": "high|medium|low", "category": "statistic|quote|event|opinion|prediction" }
     ],
     "disputedFacts": [],
     "uniqueClaims": []
   },
   "contradictions": [
     {
-      "topic": "what they disagree on",
+      "topic": "specific disagreement",
       "positions": [
-        { "sourceId": "id", "position": "what this source says" }
+        { "sourceId": "id", "position": "exact position" }
       ],
       "significance": "major|minor"
     }
   ]
 }
 
-Requirements:
-- Generate 3-5 suggested angles with varying risk levels
-- Originality scores: 90+ for truly unique takes, 70-89 for fresh perspectives, 50-69 for standard coverage
-- Include at least one "safe" angle and one "provocative" angle
-- Identify any contradictions between sources
-- Be specific about what makes each angle original`;
+SCORING GUIDE:
+- 90+: Angle most writers would miss entirely
+- 75-89: Fresh take that requires connecting dots
+- 60-74: Solid angle but somewhat predictable
+- Below 60: Standard coverage angle
+
+Generate 3-5 angles. At least one should score 80+ and take a real stance.`;
 }
 
 function parseSynthesisResponse(

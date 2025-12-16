@@ -5,6 +5,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import type { SuggestedReply } from '@/types/engage';
+import { BANNED_PHRASES } from '@/lib/ai-prompts';
 
 export async function POST(request: NextRequest) {
   try {
@@ -32,6 +33,12 @@ export async function POST(request: NextRequest) {
 
     if (anthropicKey) {
       try {
+        // Get a subset of banned phrases relevant to social replies
+        const socialBanned = BANNED_PHRASES.filter(p =>
+          ['Thank you for', 'I appreciate', 'Great point', 'Absolutely', 'Indeed'].some(s => p.includes(s)) ||
+          p.includes('Moreover') || p.includes('Furthermore')
+        ).slice(0, 10);
+
         const response = await fetch('https://api.anthropic.com/v1/messages', {
           method: 'POST',
           headers: {
@@ -44,25 +51,41 @@ export async function POST(request: NextRequest) {
             max_tokens: 1024,
             messages: [{
               role: 'user',
-              content: `Generate 3 reply options for this ${platform} comment. The comment is from ${authorName} and has ${sentiment} sentiment.
+              content: `Write 3 reply options for this ${platform} comment from ${authorName}.
 
 Comment: "${content}"
+Sentiment: ${sentiment}
 
-Provide replies in these tones:
-1. Professional - formal and business-appropriate
-2. Friendly - warm and approachable
-3. Formal - very professional, suitable for LinkedIn
+Write replies that sound like a real person typed them quickly, not a corporate social media manager.
 
-Format as JSON:
+AVOID these AI-sounding patterns:
+- Starting with "Thank you for sharing" or "Great question!"
+- "I appreciate your perspective"
+- "Absolutely!" as a response
+- Generic validation like "You make an excellent point"
+${socialBanned.length > 0 ? `- ${socialBanned.join('\n- ')}` : ''}
+
+GOOD replies:
+- React to something specific they said
+- Add a thought or question of your own
+- Match their energy level
+- Can be brief - doesn't need to be a full paragraph
+
+Tones needed:
+1. Casual - like texting a colleague
+2. Engaged - shows you actually read their comment
+3. Brief - quick acknowledgment or reaction
+
+JSON format:
 {
   "suggestions": [
-    { "content": "...", "tone": "professional", "confidence": 0.9 },
-    { "content": "...", "tone": "friendly", "confidence": 0.85 },
-    { "content": "...", "tone": "formal", "confidence": 0.8 }
+    { "content": "reply text", "tone": "casual", "confidence": 0.9 },
+    { "content": "reply text", "tone": "engaged", "confidence": 0.85 },
+    { "content": "reply text", "tone": "brief", "confidence": 0.8 }
   ]
 }
 
-Keep replies concise (under 280 chars for Twitter). Be authentic and engaging.`,
+${platform === 'twitter' ? 'Max 280 chars per reply.' : 'Keep replies concise.'}`,
             }],
           }),
         });
@@ -81,21 +104,21 @@ Keep replies concise (under 280 chars for Twitter). Be authentic and engaging.`,
       }
     }
 
-    // Fallback demo suggestions
+    // Fallback demo suggestions - sound more human
     const suggestions: SuggestedReply[] = [
       {
-        content: `Thank you for your thoughtful comment, ${authorName}! We appreciate your engagement with our content.`,
-        tone: 'professional',
+        content: `Ha, fair point ${authorName}. Hadn't thought about it that way.`,
+        tone: 'casual',
         confidence: 0.85,
       },
       {
-        content: `Hey ${authorName}! Thanks for sharing your thoughts - we love hearing from our readers!`,
-        tone: 'friendly',
+        content: `${authorName} - this is exactly why I wrote about this. What's your take on the longer-term implications?`,
+        tone: 'engaged',
         confidence: 0.80,
       },
       {
-        content: `Thank you for your feedback, ${authorName}. We value your perspective and will take it into consideration.`,
-        tone: 'formal',
+        content: `Good call.`,
+        tone: 'brief',
         confidence: 0.75,
       },
     ];

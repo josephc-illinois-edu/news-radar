@@ -6,6 +6,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import type { StoryResult, VoiceConfig, GeneratedArticle } from "../types.js";
 import type { FetchedContent } from "../utils/content-fetcher.js";
+import { getAntiDetectionPrompt } from "../utils/ai-prompts.js";
 
 /**
  * AI Voice Generator using Claude
@@ -97,8 +98,11 @@ export class AIVoiceGenerator {
     const styleGuide = this.getStyleGuide();
     const lengthGuide = this.getLengthGuide();
     const toneGuide = this.getToneGuide();
+    const antiDetection = getAntiDetectionPrompt();
 
-    let prompt = `You are writing an article for Joseph Chrisman's news analysis platform. Write in his distinctive voice.
+    let prompt = `Write an article for a news analysis platform. You have opinions and aren't afraid to share them.
+
+${antiDetection}
 
 ${styleGuide}
 
@@ -110,16 +114,16 @@ ${lengthGuide}
     // Add custom voice instructions if provided
     if (this.config.voiceInstructions) {
       prompt += `
-PERSONAL WRITING STYLE (trained from your past writing):
+YOUR WRITING VOICE (based on past samples):
 ${this.config.voiceInstructions}
 
-IMPORTANT: Follow these voice instructions closely - they reflect your authentic writing style.
+Stick to this voice - it's what your readers expect.
 `;
     }
 
     prompt += `
-ARTICLE TOPIC: ${story.title}
-SOURCE URL: ${story.url}
+TOPIC: ${story.title}
+SOURCE: ${story.url}
 `;
 
     if (fetchedContent) {
@@ -127,13 +131,12 @@ SOURCE URL: ${story.url}
 
       if (isMultiSource) {
         prompt += `
-MULTIPLE SOURCES TO ANALYZE (${(fetchedContent as any).sources.length} sources):
-This story has been covered by multiple outlets. Your job is to synthesize insights from all sources to provide a balanced, comprehensive perspective.
+${(fetchedContent as any).sources.length} SOURCES - synthesize, don't summarize each one:
 
-COMBINED ARTICLE CONTENT:
+CONTENT:
 ${fetchedContent.content.slice(0, 8000)}
 
-KEY FACTS FROM ALL SOURCES:
+FACTS TO WORK WITH:
 ${fetchedContent.facts
   .slice(0, 12)
   .map((f, i) => `${i + 1}. ${f}`)
@@ -141,7 +144,7 @@ ${fetchedContent.facts
 
 ${
   fetchedContent.quotes.length > 0
-    ? `KEY QUOTES FROM SOURCES:
+    ? `USABLE QUOTES:
 ${fetchedContent.quotes
   .slice(0, 5)
   .map((q, i) => `${i + 1}. "${q}"`)
@@ -152,20 +155,20 @@ ${fetchedContent.quotes
 
 ${
   fetchedContent.numbers.length > 0
-    ? `KEY STATISTICS:
+    ? `NUMBERS:
 ${fetchedContent.numbers.slice(0, 10).join(", ")}
 `
     : ""
 }
 
-IMPORTANT: Look for different perspectives, contradictions, or complementary information across sources. Synthesize these into a cohesive analysis.
+Look for where sources disagree or add different context. That's often the interesting part.
 `;
       } else {
         prompt += `
-ARTICLE CONTENT TO ANALYZE:
+SOURCE CONTENT:
 ${fetchedContent.content.slice(0, 8000)}
 
-KEY FACTS FROM SOURCE:
+KEY FACTS:
 ${fetchedContent.facts
   .slice(0, 8)
   .map((f, i) => `${i + 1}. ${f}`)
@@ -173,7 +176,7 @@ ${fetchedContent.facts
 
 ${
   fetchedContent.quotes.length > 0
-    ? `KEY QUOTES:
+    ? `QUOTES:
 ${fetchedContent.quotes
   .slice(0, 3)
   .map((q, i) => `${i + 1}. "${q}"`)
@@ -184,7 +187,7 @@ ${fetchedContent.quotes
 
 ${
   fetchedContent.numbers.length > 0
-    ? `KEY STATISTICS:
+    ? `NUMBERS:
 ${fetchedContent.numbers.slice(0, 8).join(", ")}
 `
     : ""
@@ -193,28 +196,26 @@ ${fetchedContent.numbers.slice(0, 8).join(", ")}
       }
     } else {
       prompt += `
-NOTE: No source article content available. Write based on the topic and your analysis of what this story means.
+No source content available - work with the topic and what you know about it.
 `;
     }
 
     prompt += `
-INSTRUCTIONS:
-1. Write an engaging, original article that analyzes this story
-2. Use the facts, quotes, and numbers provided to support your analysis
-3. Don't just summarize - provide YOUR perspective and insights
-4. Connect this story to broader trends or implications
-5. Make it conversational and accessible, not academic unless specified
-6. Start with a compelling hook that draws readers in
-7. End with a thought-provoking question or call to reflection
+YOUR JOB:
+- Analyze, don't summarize
+- Have a take - what's your read on this?
+- Use the facts/quotes to support your points
+- Connect to bigger picture if relevant
+- Write something worth reading
 
 FORMAT:
-- Start with # [Your Article Title]
-- Use ## for section headers
-- Write in markdown format
-- Do NOT include a sources/citations section (that will be added automatically)
-- Do NOT include author byline (that will be added automatically)
+- # [Title] at the top
+- ## for section breaks if needed
+- Markdown
+- Skip the citations section (added automatically)
+- No byline (added automatically)
 
-Write the complete article now:`;
+Go:`;
 
     return prompt;
   }
@@ -224,24 +225,20 @@ Write the complete article now:`;
    */
   private getStyleGuide(): string {
     if (this.config.style === "academic") {
-      return `WRITING STYLE: Academic/Formal
-- Use sophisticated vocabulary and complex sentence structures
-- Reference broader concepts (historical patterns, institutional behavior, systemic issues)
-- Be measured and analytical in tone
-- Use phrases like "Consider what this represents", "The observable phenomenon", "What distinguishes this moment"
-- Cite implications for democratic systems, accountability mechanisms, institutional norms
-- Maintain intellectual rigor while remaining accessible`;
+      return `STYLE: Analytical
+- Dig into the why, not just the what
+- Reference patterns and precedents when relevant
+- Take positions but back them up
+- Can use more complex sentences, but don't be obtuse
+- Intellectual but not stuffy`;
     }
 
-    return `WRITING STYLE: Conversational
-- Write like you're talking to a smart friend over coffee
-- Use "I" and "you" freely
-- Keep sentences crisp and punchy
-- Vary your openings - avoid repetitive phrases or formulaic starts
-- Be direct and relatable, but change up your approach each time
-- It's okay to be a little dramatic for emphasis
-- Use occasional humor, but stay grounded in facts
-- IMPORTANT: Each article should feel fresh and unique, not templated`;
+    return `STYLE: Conversational
+- Write like you're explaining to a smart friend
+- "I" and "you" are fine
+- Short sentences mixed with longer ones
+- Strong opinions welcome
+- Skip the throat-clearing - get to the point`;
   }
 
   /**
@@ -250,46 +247,39 @@ Write the complete article now:`;
   private getToneGuide(): string {
     const { humor, urgency, optimism, criticism } = this.config.tone;
 
-    let guide = "TONE SETTINGS:\n";
+    const parts: string[] = [];
 
     if (urgency > 7) {
-      guide +=
-        "- HIGH URGENCY: This matters NOW. Make readers feel the importance and timeliness.\n";
+      parts.push("This matters now - make that clear without being alarmist");
     } else if (urgency > 5) {
-      guide +=
-        "- MODERATE URGENCY: Important but not panic-inducing. Thoughtful concern.\n";
-    } else {
-      guide +=
-        "- LOW URGENCY: Take your time. This is about understanding, not reacting.\n";
+      parts.push("Worth paying attention to, not a crisis");
     }
+    // low urgency: don't add anything
 
     if (optimism > 6) {
-      guide +=
-        "- OPTIMISTIC: Find the silver lining. Show how this could lead to positive change.\n";
+      parts.push("Find the opportunity angle, but don't be naive");
     } else if (optimism < 4) {
-      guide +=
-        "- REALISTIC/SKEPTICAL: Don't sugarcoat. Call out problems honestly.\n";
-    } else {
-      guide += "- BALANCED: Present both concerns and opportunities.\n";
+      parts.push("Be real about the problems - skepticism is warranted");
     }
+    // balanced: don't add anything
 
     if (criticism > 6) {
-      guide +=
-        "- CRITICAL: Don't hold back on calling out problems, failures, or bad actors.\n";
+      parts.push("Call it like you see it - don't pull punches");
     } else if (criticism < 4) {
-      guide +=
-        "- MEASURED: Be fair. Acknowledge complexity and competing interests.\n";
+      parts.push("More observational than critical");
     }
 
     if (humor > 5) {
-      guide +=
-        "- HUMOR: Use wit and occasional sarcasm, but don't undercut serious points.\n";
+      parts.push("Humor welcome - dry wit, not slapstick");
     } else if (humor > 2) {
-      guide +=
-        "- LIGHT HUMOR: A wry observation here and there, but mostly serious.\n";
+      parts.push("A wry observation here and there is fine");
     }
 
-    return guide;
+    if (parts.length === 0) {
+      return "";
+    }
+
+    return `TONE:\n${parts.map((p) => `- ${p}`).join("\n")}`;
   }
 
   /**
@@ -297,13 +287,10 @@ Write the complete article now:`;
    */
   private getLengthGuide(): string {
     const guides: Record<VoiceConfig["length"], string> = {
-      tweet:
-        "TARGET LENGTH: Tweet-length (240-280 characters). ONE punchy take.",
-      short:
-        "TARGET LENGTH: Short-form (200-400 words). Quick read, one main point.",
-      medium:
-        "TARGET LENGTH: Medium-form (500-800 words). Develop 2-3 key points with analysis.",
-      long: "TARGET LENGTH: Long-form (1000-1500 words). Deep dive with multiple angles and implications.",
+      tweet: "LENGTH: Tweet (240-280 chars). One sharp take.",
+      short: "LENGTH: ~300 words. Make one point well.",
+      medium: "LENGTH: ~600 words. Room for 2-3 points.",
+      long: "LENGTH: ~1200 words. Go deep.",
     };
 
     return guides[this.config.length];

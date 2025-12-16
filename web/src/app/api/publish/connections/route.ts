@@ -17,7 +17,7 @@ function isSubstackConfigured(): boolean {
   );
 }
 
-// Get connections - currently only Substack is supported
+// Get connections - returns all platforms, with connection status
 function getConnections(): PlatformConnection[] {
   const substackConfigured = isSubstackConfigured();
   const substackUrl = process.env.SUBSTACK_PUBLICATION_URL;
@@ -30,6 +30,31 @@ function getConnections(): PlatformConnection[] {
       username: process.env.SUBSTACK_EMAIL || undefined,
       connected: substackConfigured,
       connectedAt: substackConfigured ? new Date().toISOString() : undefined,
+    },
+    // Future platforms - not yet implemented
+    {
+      id: 'conn-linkedin',
+      platform: 'linkedin',
+      name: 'LinkedIn',
+      connected: false,
+    },
+    {
+      id: 'conn-twitter',
+      platform: 'twitter',
+      name: 'Twitter/X',
+      connected: false,
+    },
+    {
+      id: 'conn-facebook',
+      platform: 'facebook',
+      name: 'Facebook',
+      connected: false,
+    },
+    {
+      id: 'conn-medium',
+      platform: 'medium',
+      name: 'Medium',
+      connected: false,
     },
   ];
 }

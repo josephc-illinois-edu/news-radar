@@ -65,7 +65,9 @@ export async function GET(request: NextRequest) {
     if (!supabase) {
       let filtered = [...demoArticles];
       if (filters.status) {
-        filtered = filtered.filter(a => a.status === filters.status);
+        // Support comma-separated status values (e.g., "draft,review")
+        const statuses = filters.status.split(',').map(s => s.trim());
+        filtered = filtered.filter(a => statuses.includes(a.status));
       }
       if (filters.search) {
         const search = filters.search.toLowerCase();
@@ -99,7 +101,9 @@ export async function GET(request: NextRequest) {
       .order('created_at', { ascending: false });
 
     if (filters.status) {
-      query = query.eq('status', filters.status);
+      // Support comma-separated status values (e.g., "draft,review")
+      const statuses = filters.status.split(',').map(s => s.trim());
+      query = query.in('status', statuses);
     }
 
     if (filters.platform) {

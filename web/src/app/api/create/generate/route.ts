@@ -7,6 +7,11 @@
  */
 import { NextRequest, NextResponse } from 'next/server';
 import type { GenerationOptions, GeneratedArticle, GenerationResult } from '@/types/create';
+import {
+  getContentSystemPrompt,
+  getPlatformVoicePrompt,
+  getNaturalTonePrompt,
+} from '@/lib/ai-prompts';
 
 // Simple content fetcher (production would use the CLI's content-fetcher)
 async function fetchContent(url: string): Promise<{ title: string; content: string; facts: string[] }> {
@@ -111,47 +116,57 @@ function buildPrompt(
   options: GenerationOptions,
   wordTarget: string
 ): string {
-  const toneDescription = `
-    Humor level: ${options.tone.humor}/10 (${options.tone.humor > 5 ? 'include wit and humor' : 'keep it serious'})
-    Urgency: ${options.tone.urgency}/10 (${options.tone.urgency > 5 ? 'convey importance' : 'relaxed pace'})
-    Optimism: ${options.tone.optimism}/10 (${options.tone.optimism > 5 ? 'positive outlook' : 'cautious tone'})
-    Criticism: ${options.tone.criticism}/10 (${options.tone.criticism > 5 ? 'analytical/critical' : 'supportive'})
-  `;
+  const systemPrompt = getContentSystemPrompt(
+    `You write ${options.platform} content. You have strong opinions and a distinctive voice.`
+  );
+
+  const platformVoice = getPlatformVoicePrompt(options.platform);
+
+  const tonePrompt = getNaturalTonePrompt({
+    humor: options.tone.humor,
+    urgency: options.tone.urgency,
+    criticism: options.tone.criticism,
+    optimism: options.tone.optimism,
+  });
 
   const sourceSummaries = sources
-    .map((s, i) => `Source ${i + 1}: "${s.title}"\nFacts: ${s.facts.join('; ') || 'No specific facts extracted'}\nContent preview: ${s.content.slice(0, 500)}...`)
+    .map((s, i) => `Source ${i + 1}: "${s.title}"\nKey facts: ${s.facts.join('; ') || 'None extracted'}\nContent: ${s.content.slice(0, 500)}...`)
     .join('\n\n');
 
-  return `You are a professional content writer creating ${options.platform} posts.
+  const styleGuide = options.style === 'academic'
+    ? 'Write with intellectual rigor - cite implications, reference patterns, maintain analytical depth.'
+    : 'Write like you\'re explaining this to a smart friend. Skip the formalities.';
 
-Write ${options.variations} unique article variation(s) based on these sources:
+  return `${systemPrompt}
 
+${platformVoice}
+${tonePrompt}
+
+SOURCES TO WORK WITH:
 ${sourceSummaries}
 
-Requirements:
-- Platform: ${options.platform}
-- Target length: ${wordTarget} words
-- Style: ${options.style}
-- Tone settings:
-${toneDescription}
+YOUR TASK:
+Write ${options.variations} distinct piece(s), each ~${wordTarget} words.
+${styleGuide}
 
-Output format (JSON):
+Each piece needs a different angle:
+- One might be more analytical
+- Another more opinionated
+- Another focused on a specific surprising detail
+
+FORMAT (JSON):
 {
   "articles": [
     {
-      "title": "Article title",
-      "content": "Full article content...",
+      "title": "Your title - make it specific, not generic",
+      "content": "The full piece in markdown",
       "angle": "balanced|provocative|human-interest|analysis|satirical",
-      "suggestedHashtags": ["#tag1", "#tag2"]
+      "suggestedHashtags": ["#relevant", "#specific"]
     }
   ]
 }
 
-Important:
-- Each variation should take a different angle
-- Include proper attribution to sources
-- Make content engaging for ${options.platform} audience
-- Use ${options.style} writing style`;
+Credit your sources naturally within the text. Don't add a separate citations section.`;
 }
 
 function parseArticleResponse(content: string, variationCount: number): GeneratedArticle[] {

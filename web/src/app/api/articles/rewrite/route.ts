@@ -11,6 +11,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server';
 import type { RewriteRequest, RewriteResponse, EditorialPosition } from '@/types/database';
+import { getAntiDetectionPrompt, getNaturalTonePrompt } from '@/lib/ai-prompts';
 
 // Model configs with pricing (per 1K tokens)
 const MODEL_CONFIG = {
@@ -162,54 +163,45 @@ function buildRewritePrompt(params: {
 }): string {
   const { content, instruction, editorial_position, editorial_notes, tone_humor, tone_urgency, tone_criticism, tone_optimism } = params;
 
+  // Convert 0-100 scale to 0-10 for tone prompts
+  const tonePrompt = getNaturalTonePrompt({
+    humor: tone_humor !== undefined ? Math.round(tone_humor / 10) : undefined,
+    urgency: tone_urgency !== undefined ? Math.round(tone_urgency / 10) : undefined,
+    criticism: tone_criticism !== undefined ? Math.round(tone_criticism / 10) : undefined,
+    optimism: tone_optimism !== undefined ? Math.round(tone_optimism / 10) : undefined,
+  });
+
   let editorialContext = '';
 
   if (editorial_position && editorial_position !== 'neutral') {
-    const positionGuide = {
-      left: 'progressive, emphasizing social justice, equity, and systemic critiques',
-      'center-left': 'moderately progressive, balanced but leaning toward reform',
-      center: 'balanced, presenting multiple viewpoints equally',
-      'center-right': 'moderately conservative, emphasizing tradition and measured change',
-      right: 'conservative, emphasizing individual responsibility and traditional values',
+    const positionGuide: Record<string, string> = {
+      left: 'Frame from a progressive angle - focus on systemic issues, equity concerns',
+      'center-left': 'Lean progressive but acknowledge complexity',
+      center: 'Present the facts, let readers draw conclusions',
+      'center-right': 'Lean toward traditional values, measured skepticism of change',
+      right: 'Frame from a conservative angle - individual responsibility, tradition',
     };
-    editorialContext += `\nEditorial position: ${positionGuide[editorial_position] || editorial_position}`;
-  }
-
-  if (tone_humor !== undefined && tone_humor !== 50) {
-    const humorLevel = tone_humor > 70 ? 'playful and witty' : tone_humor > 40 ? 'balanced with light touches' : 'serious and straightforward';
-    editorialContext += `\nHumor: ${humorLevel} (${tone_humor}/100)`;
-  }
-
-  if (tone_urgency !== undefined && tone_urgency !== 50) {
-    const urgencyLevel = tone_urgency > 70 ? 'urgent, time-sensitive' : tone_urgency > 40 ? 'moderately pressing' : 'relaxed, evergreen';
-    editorialContext += `\nUrgency: ${urgencyLevel} (${tone_urgency}/100)`;
-  }
-
-  if (tone_optimism !== undefined && tone_optimism !== 50) {
-    const optimismLevel = tone_optimism > 70 ? 'optimistic' : tone_optimism > 40 ? 'balanced' : 'cautious/pessimistic';
-    editorialContext += `\nOptimism: ${optimismLevel} (${tone_optimism}/100)`;
-  }
-
-  if (tone_criticism !== undefined && tone_criticism !== 50) {
-    const criticismLevel = tone_criticism > 70 ? 'highly critical' : tone_criticism > 40 ? 'moderately critical' : 'supportive';
-    editorialContext += `\nCriticism: ${criticismLevel} (${tone_criticism}/100)`;
+    editorialContext += `\nPerspective: ${positionGuide[editorial_position] || editorial_position}`;
   }
 
   if (editorial_notes?.trim()) {
-    editorialContext += `\nAdditional editorial notes: ${editorial_notes}`;
+    editorialContext += `\nSpecific notes: ${editorial_notes}`;
   }
 
-  return `You are an expert editor helping rewrite article content. Your task is to rewrite the following content according to the user's instruction while maintaining accuracy and readability.
-${editorialContext ? `\n## Editorial Context${editorialContext}` : ''}
+  const antiDetection = getAntiDetectionPrompt();
 
-## Original Content
+  return `You're rewriting content to sound more natural and human.
+${antiDetection}
+${tonePrompt}
+${editorialContext ? `\nEDITORIAL DIRECTION:${editorialContext}` : ''}
+
+ORIGINAL:
 ${content}
 
-## Rewrite Instruction
+INSTRUCTION:
 ${instruction}
 
-## Output
-Provide only the rewritten content, without any preamble, explanation, or commentary. The output should be ready to use directly.`;
+Rewrite the content. Output ONLY the rewritten text - no explanations, no "here's the rewrite", just the content itself.`;
 }
 
 function buildPartialRewritePrompt(params: {
@@ -237,66 +229,54 @@ function buildPartialRewritePrompt(params: {
     tone_optimism,
   } = params;
 
+  // Convert 0-100 scale to 0-10 for tone prompts
+  const tonePrompt = getNaturalTonePrompt({
+    humor: tone_humor !== undefined ? Math.round(tone_humor / 10) : undefined,
+    urgency: tone_urgency !== undefined ? Math.round(tone_urgency / 10) : undefined,
+    criticism: tone_criticism !== undefined ? Math.round(tone_criticism / 10) : undefined,
+    optimism: tone_optimism !== undefined ? Math.round(tone_optimism / 10) : undefined,
+  });
+
   let editorialContext = '';
 
   if (editorial_position && editorial_position !== 'neutral') {
-    const positionGuide = {
-      left: 'progressive, emphasizing social justice, equity, and systemic critiques',
-      'center-left': 'moderately progressive, balanced but leaning toward reform',
-      center: 'balanced, presenting multiple viewpoints equally',
-      'center-right': 'moderately conservative, emphasizing tradition and measured change',
-      right: 'conservative, emphasizing individual responsibility and traditional values',
+    const positionGuide: Record<string, string> = {
+      left: 'progressive angle',
+      'center-left': 'lean progressive',
+      center: 'neutral/balanced',
+      'center-right': 'lean conservative',
+      right: 'conservative angle',
     };
-    editorialContext += `\nEditorial position: ${positionGuide[editorial_position] || editorial_position}`;
-  }
-
-  if (tone_humor !== undefined && tone_humor !== 50) {
-    const humorLevel = tone_humor > 70 ? 'playful and witty' : tone_humor > 40 ? 'balanced with light touches' : 'serious and straightforward';
-    editorialContext += `\nHumor: ${humorLevel}`;
-  }
-
-  if (tone_urgency !== undefined && tone_urgency !== 50) {
-    const urgencyLevel = tone_urgency > 70 ? 'urgent, time-sensitive' : tone_urgency > 40 ? 'moderately pressing' : 'relaxed, evergreen';
-    editorialContext += `\nUrgency: ${urgencyLevel}`;
-  }
-
-  if (tone_optimism !== undefined && tone_optimism !== 50) {
-    const optimismLevel = tone_optimism > 70 ? 'optimistic' : tone_optimism > 40 ? 'balanced' : 'cautious/pessimistic';
-    editorialContext += `\nOptimism: ${optimismLevel}`;
-  }
-
-  if (tone_criticism !== undefined && tone_criticism !== 50) {
-    const criticismLevel = tone_criticism > 70 ? 'highly critical' : tone_criticism > 40 ? 'moderately critical' : 'supportive';
-    editorialContext += `\nCriticism: ${criticismLevel}`;
+    editorialContext += `Perspective: ${positionGuide[editorial_position] || editorial_position}`;
   }
 
   if (editorial_notes?.trim()) {
-    editorialContext += `\nAdditional notes: ${editorial_notes}`;
+    editorialContext += editorialContext ? `. ${editorial_notes}` : editorial_notes;
   }
+
+  const antiDetection = getAntiDetectionPrompt();
 
   // Build context sections
   const contextBeforeSection = context_before?.trim()
-    ? `## Context Before (DO NOT include in output)\n${context_before}\n`
+    ? `[CONTEXT - text before selection, for reference only]\n${context_before}\n---\n`
     : '';
 
   const contextAfterSection = context_after?.trim()
-    ? `## Context After (DO NOT include in output)\n${context_after}`
+    ? `\n---\n[CONTEXT - text after selection, for reference only]\n${context_after}`
     : '';
 
-  return `You are an expert editor. Rewrite ONLY the selected text according to the instruction. The context is provided for understanding but should NOT be included in your output.
-${editorialContext ? `\n## Editorial Guidelines${editorialContext}` : ''}
+  return `Rewrite ONLY the selected text. Match the surrounding style and flow.
+${antiDetection}
+${tonePrompt}
+${editorialContext ? `\nDirection: ${editorialContext}` : ''}
 
-${contextBeforeSection}
-## Selected Text (REWRITE THIS)
+${contextBeforeSection}>>> SELECTED TEXT TO REWRITE <<<
 ${content}
+>>> END SELECTED TEXT <<<${contextAfterSection}
 
-${contextAfterSection}
+Instruction: ${instruction}
 
-## Instruction
-${instruction}
-
-## Output
-Provide ONLY the rewritten version of the selected text. Do not include any context, preamble, or explanation. The output should seamlessly replace the selected text.`;
+Output ONLY the replacement text. No quotes, no explanations, just the rewritten selection.`;
 }
 
 function generateMockRewrite(content: string, instruction: string): RewriteResponse {

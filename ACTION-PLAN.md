@@ -1,296 +1,318 @@
-# 📋 News Radar - Your Action Plan
+# 📋 News Radar Studio - Development Action Plan
 
-## ✅ TODAY (Next 1-2 Hours)
+> **Last Updated:** December 2024  
+> **Current Version:** 0.3.0  
+> **Next Target:** 0.4.0 - Quality & Testing Foundation
 
-### Immediate Setup
-1. **Open Terminal/PowerShell**
-   ```bash
-   cd C:\Users\josephc\OneDrive\DevJournal\news-radar
-   ```
+---
 
-2. **Run Setup Script** (Windows)
-   ```bash
-   setup.bat
-   ```
-   
-   OR manually:
-   ```bash
-   npm install
-   npm run scan
-   ```
+## 📊 Project Assessment
 
-3. **Verify It Works**
-   - You should see stories from HackerNews and Reddit
-   - Check that anomalies are detected
-   - Verify colored output works
+### What's Built (✅ Complete)
 
-### First Real Scan
+| Module | CLI | Web | Tests | Docs |
+|--------|-----|-----|-------|------|
+| Scanner (HN, Lobsters, Guardian) | ✅ | ✅ | ❌ | ✅ |
+| Article Generation | ✅ | ✅ | ❌ | ✅ |
+| Voice Training | ✅ | ⚠️ | ❌ | ✅ |
+| Multi-Platform Publishing | ✅ | ✅ | ❌ | ⚠️ |
+| Image Generation (DALL-E) | ✅ | ✅ | ❌ | ⚠️ |
+| Research & Comparison | — | ✅ | ❌ | ✅ |
+| Synthesis Workflow | — | ✅ | ❌ | ⚠️ |
+| Analytics Dashboard | — | ✅ | ❌ | ❌ |
+| Engagement Module | — | ✅ | ❌ | ❌ |
+| Database (Supabase) | ✅ | ✅ | ❌ | ✅ |
+
+**Legend:** ✅ Complete | ⚠️ Partial | ❌ Missing | — Not Applicable
+
+### Critical Gap: Zero Test Coverage
+
+The project has **no test files** in `src/` or `web/src/`. This is the highest priority debt.
+
+---
+
+## 🎯 Phase 1: Testing Foundation (Current Sprint)
+
+> **Goal:** Establish TDD workflow with critical path coverage  
+> **Subagent:** `tdd-coach` → Use BEFORE writing any new code
+
+### Week 1: Core API Route Tests
+
+| Priority | File | Subagent Command |
+|----------|------|------------------|
+| P0 | `web/src/app/api/scanner/route.ts` | `"Use tdd-coach to write tests for the scanner API"` |
+| P0 | `web/src/app/api/articles/route.ts` | `"Use tdd-coach to write tests for articles CRUD"` |
+| P1 | `web/src/app/api/create/synthesize/route.ts` | `"Use tdd-coach to write tests for AI synthesis"` |
+| P1 | `web/src/app/api/research/compare/route.ts` | `"Use tdd-coach to write tests for comparison API"` |
+
+**Done When:**
+- [ ] `npm test` runs without errors
+- [ ] Scanner API has 80%+ coverage
+- [ ] Articles CRUD has happy path + error tests
+- [ ] Mock patterns established for Anthropic/Supabase
+
+### Week 2: Hook Tests (React Query)
+
+| Priority | Hook | Focus Areas |
+|----------|------|-------------|
+| P0 | `use-scanner.ts` | Query keys, refetch behavior, error states |
+| P0 | `use-articles.ts` | Mutations, optimistic updates, cache invalidation |
+| P1 | `use-research.ts` | Selection state, comparison flow |
+| P1 | `use-synthesis.ts` | Context preservation, angle selection |
+
+**Subagent Command:**
+```
+"Use tdd-coach to write React Query hook tests for use-scanner"
+```
+
+---
+
+## 🔧 Phase 2: Type Safety Audit
+
+> **Goal:** Eliminate all `any` types  
+> **Subagent:** `type-enforcer`
+
+### Type Files to Audit
+
+| File | Status | Issues |
+|------|--------|--------|
+| `web/src/types/scanner.ts` | ✅ | Well-typed |
+| `web/src/types/research.ts` | ✅ | Well-typed |
+| `web/src/types/synthesis.ts` | ⚠️ | Check for implicit any |
+| `web/src/types/database.ts` | ⚠️ | Verify Supabase types |
+| `src/types.ts` | ⚠️ | Legacy CLI types - review |
+
+**Subagent Command:**
+```
+"Use type-enforcer to audit web/src/types/ for any types"
+```
+
+### API Routes to Type-Check
+
+```
+"Use type-enforcer to review api/scanner/route.ts for strict typing"
+```
+
+**Done When:**
+- [ ] `npm run type-check` passes with zero errors
+- [ ] No `any` in production code
+- [ ] All API responses have typed interfaces
+
+---
+
+## 🔌 Phase 3: New API Endpoints (v0.4.0)
+
+> **Subagent:** `api-builder`
+
+### Planned Endpoints
+
+| Endpoint | Purpose | Subagent Command |
+|----------|---------|------------------|
+| `GET /api/voice/profiles` | List trained voices | `"Use api-builder to create voice profiles endpoint"` |
+| `POST /api/voice/train` | Train new voice | `"Use api-builder to create voice training endpoint"` |
+| `POST /api/articles/batch` | Batch operations | `"Use api-builder to create batch articles endpoint"` |
+| `GET /api/analytics/export` | Export analytics | `"Use api-builder to create analytics export"` |
+
+**Workflow:**
+1. `task-breakdown` → Plan the endpoint
+2. `tdd-coach` → Write tests first
+3. `api-builder` → Implement endpoint
+4. `type-enforcer` → Verify types
+
+---
+
+## 📝 Phase 4: Documentation Debt
+
+> **Subagent:** `doc-writer`
+
+### Missing Documentation
+
+| Module | Priority | Command |
+|--------|----------|---------|
+| Analytics Dashboard | P0 | `"Use doc-writer to document the analytics module"` |
+| Engagement Module | P0 | `"Use doc-writer to document the engage module"` |
+| Synthesis Workflow | P1 | `"Use doc-writer to document the synthesis workflow"` |
+| Voice Training (Web) | P1 | `"Use doc-writer to document web voice training"` |
+
+**Output Requirements:**
+- HTML for browser preview
+- Markdown for repo
+- 10th-grade reading level
+- Code examples with TSDoc
+
+---
+
+## 🧠 ADHD-Optimized Workflow
+
+> **Subagent:** `task-breakdown` → Use at the START of any new work
+
+### Daily Pattern
+
+```
+Morning (15 min):
+1. "Use task-breakdown to plan today's work on [feature]"
+2. Review task list, pick first task
+3. Set 25-minute timer
+
+Per Task:
+1. "Use tdd-coach to write tests for [task]"
+2. Run tests (should fail - RED)
+3. Implement to pass tests (GREEN)
+4. "Use type-enforcer to review [file]"
+5. Commit with conventional message
+
+End of Day (10 min):
+1. "Use doc-writer to document [completed feature]"
+2. Update this ACTION-PLAN.md
+```
+
+### Context Preservation Tips
+
+**Before switching tasks:**
+```
+"Summarize current state: what's done, what's next, which files are open"
+```
+
+**After returning:**
+```
+"Use task-breakdown to review where we left off on [feature]"
+```
+
+---
+
+## 🚀 Quick Reference: Subagent Commands
+
+### Starting New Work
+```
+"Use task-breakdown to plan [feature name]"
+```
+
+### Before Writing Code
+```
+"Use tdd-coach to write tests for [component/function]"
+```
+
+### During Code Review
+```
+"Use type-enforcer to review [file path]"
+```
+
+### Building API Endpoints
+```
+"Use api-builder to create [endpoint description]"
+```
+
+### After Completing Features
+```
+"Use doc-writer to document [feature name]"
+```
+
+### Chaining (Complex Tasks)
+```
+"First use task-breakdown to plan the bookmark feature, then use tdd-coach for the first task"
+```
+
+---
+
+## 📁 Project Structure Reference
+
+```
+news-radar/
+├── .claude/
+│   ├── agents/              # 🆕 Your subagents
+│   │   ├── tdd-coach.md
+│   │   ├── type-enforcer.md
+│   │   ├── api-builder.md
+│   │   ├── doc-writer.md
+│   │   └── task-breakdown.md
+│   ├── commands/            # Slash commands
+│   ├── skills/              # Domain knowledge
+│   └── instructions.md      # Project context
+├── src/                     # CLI backend
+│   ├── services/            # Database, AI services
+│   ├── generators/          # Article generation
+│   ├── scrapers/            # News sources
+│   └── types.ts             # CLI types
+├── web/                     # Next.js frontend
+│   └── src/
+│       ├── app/api/         # API routes
+│       ├── components/      # React components
+│       ├── hooks/           # React Query hooks
+│       └── types/           # TypeScript interfaces
+└── supabase/               # Database migrations
+```
+
+---
+
+## 🎯 Success Metrics
+
+### This Week
+- [ ] First test file created and passing
+- [ ] `npm test` command working
+- [ ] Scanner API has basic test coverage
+
+### This Month
+- [ ] 60%+ test coverage on API routes
+- [ ] Zero `any` types in web/src/
+- [ ] All modules have basic documentation
+
+### This Quarter
+- [ ] 80%+ overall test coverage
+- [ ] CI/CD pipeline running tests
+- [ ] v0.4.0 features complete
+
+---
+
+## 🔄 Git Workflow Reminder
+
+### Before Starting Features
 ```bash
-# Morning briefing
-npm run scan -- --hours 24 --min-score 100
-
-# Save to file for reference
-npm run scan -- --hours 24 > daily-scan-$(date +%Y%m%d).txt
+git checkout -b feature/0.4.0-testing-foundation
 ```
 
----
-
-## 📅 THIS WEEK
-
-### Monday-Tuesday: Expand Sources
-- [ ] Add Lobsters scraper
-- [ ] Add Product Hunt scraper  
-- [ ] Test YouTube RSS feeds
-
-### Wednesday-Thursday: Intelligence Layer
-- [ ] Implement keyword clustering
-- [ ] Add story deduplication
-- [ ] Create trend prediction (basic)
-
-### Friday: Integrate with Workflow
-- [ ] Set up daily automated scans
-- [ ] Create template for newsletter
-- [ ] Test full workflow end-to-end
-
----
-
-## 🎯 NEXT 2 WEEKS
-
-### Week 2: Publishing Tools
-- [ ] Voice analysis (match your writing style)
-- [ ] Citation generator
-- [ ] Export to Markdown format
-- [ ] Image attribution system
-
-### Week 3: Web Dashboard (NextJS)
-- [ ] Basic UI with story cards
-- [ ] Supabase integration
-- [ ] Save/dismiss functionality
-- [ ] Keyboard shortcuts
-
-### Week 4: Team Features
-- [ ] Share scans with team
-- [ ] Collaborative tagging
-- [ ] Comment/notes system
-- [ ] Export reports
-
----
-
-## 🛠️ Technical Improvements
-
-### Priority 1 (This Week)
-- [ ] Add tests for scrapers
-- [ ] Implement retry logic for failed requests
-- [ ] Cache results to avoid re-scraping
-- [ ] Add logging system
-
-### Priority 2 (Next Week)
-- [ ] Database persistence (Supabase)
-- [ ] Story deduplication across sources
-- [ ] Historical trending analysis
-- [ ] Performance optimization
-
-### Priority 3 (Future)
-- [ ] Machine learning prediction model
-- [ ] Real-time websocket updates
-- [ ] Mobile app (React Native)
-- [ ] API for external integrations
-
----
-
-## 📚 Learning Resources
-
-### Scrapers to Study
-- [HackerNews Algolia API](https://hn.algolia.com/api)
-- [Reddit RSS Feeds](https://www.reddit.com/wiki/rss)
-- [YouTube RSS](https://support.google.com/youtube/answer/6224202)
-- [Unsplash API](https://unsplash.com/developers)
-
-### Attribution & Fair Use
-- [Creative Commons Licenses](https://creativecommons.org/licenses/)
-- [Fair Use Guidelines](https://www.copyright.gov/fair-use/)
-- [Proper Citation Formats](https://www.scribbr.com/citing-sources/)
-
----
-
-## 🎨 Content Strategy
-
-### Newsletter Template
-```markdown
-# Daily Tech Radar - {Date}
-
-## 🚨 Breaking Soon
-{Top 3 anomalies with brief analysis}
-
-## 📰 Today's Must-Reads
-{Top 10 stories by velocity}
-
-## 🔥 Trending Topics
-{Keyword cluster analysis}
-
-## 💭 My Take
-{Your original analysis}
-
----
-Sources: HackerNews, Reddit
-Powered by News Radar
+### Commit Messages
+```
+feat: add scanner API tests
+test: add use-scanner hook tests  
+docs: add analytics module documentation
+refactor: eliminate any types in synthesis
 ```
 
-### Voice Development
-Study these content creators:
-- **Heather Cox Richardson** - Historical context, narrative flow
-- **Neil DeGrasse Tyson** - Accessible explanations, enthusiasm
-- **Bryan Tyler Cohen** - Clear opinions, source-backed
-
-Practice:
-1. Scan for stories
-2. Pick 1-2 that resonate
-3. Write 200-word analysis
-4. Compare to your voice examples
-5. Iterate daily
-
----
-
-## 🔄 Daily Workflow
-
-### Morning (15 min)
+### After Completing
 ```bash
-# 1. Run scan
-npm run scan -- --hours 24 --min-score 100
-
-# 2. Review anomalies (stories breaking soon)
-# 3. Note top 3 keywords
-# 4. Click through 5-10 interesting stories
+git push origin feature/0.4.0-testing-foundation
+# Create PR to main
 ```
-
-### Midday (30 min)
-- Deep dive on 2-3 stories
-- Research related sources
-- Draft initial analysis (voice practice)
-- Gather supporting media/data
-
-### Evening (15 min)
-```bash
-# Check for updates
-npm run scan -- --hours 6 --keywords "{your-topics}"
-
-# Finalize newsletter/post
-# Publish
-```
-
----
-
-## 📊 Success Metrics
-
-### Week 1 Goals
-- ✅ CLI working reliably
-- ✅ Scan 50+ stories daily
-- ✅ Detect 3-5 anomalies daily
-- ✅ Identify 1-2 "breaking soon" stories
-
-### Week 2 Goals
-- 🎯 Add 2 more sources (Lobsters, Product Hunt)
-- 🎯 Write 3-5 newsletter drafts
-- 🎯 Develop consistent voice
-- 🎯 Share with 1-2 team members
-
-### Month 1 Goals
-- 🎯 Web dashboard deployed
-- 🎯 Database storing historical data
-- 🎯 Published 10+ newsletter editions
-- 🎯 Team using system daily
-
----
-
-## 🚨 Common Pitfalls to Avoid
-
-### 1. Scope Creep
-❌ Don't: Try to build everything at once
-✅ Do: Focus on CLI → Voice → Dashboard
-
-### 2. Over-Engineering
-❌ Don't: Add ML before you have baseline working
-✅ Do: Start with simple stats (mean, stddev)
-
-### 3. Ignoring Fair Use
-❌ Don't: Copy entire articles or use images without credit
-✅ Do: Snippet + link + proper attribution
-
-### 4. Analysis Paralysis
-❌ Don't: Wait for perfect system before writing
-✅ Do: Start writing NOW with basic scans
-
----
-
-## 💡 Quick Wins
-
-### This Afternoon
-- Run a scan right now
-- Pick one story
-- Write 100 words about it
-- Share with team
-
-### Tomorrow Morning
-- Schedule daily scan (Task Scheduler / cron)
-- Create "inbox" folder for interesting stories
-- Start tracking keywords that matter to you
-
-### End of Week
-- Have 5 newsletter drafts ready
-- Identify your 3 core topics
-- Share News Radar with 2 colleagues
-
----
-
-## 🎓 Next Learning Steps
-
-### TypeScript Deep Dive
-- Read [TypeScript Handbook](https://www.typescriptlang.org/docs/handbook/)
-- Practice strict typing (no `any`)
-- Learn generics and utility types
-
-### Web Scraping Ethics
-- Study robots.txt
-- Respect rate limits
-- Follow terms of service
-- Understand fair use
-
-### Content Creation
-- Read "On Writing" by Stephen King
-- Study your voice role models
-- Practice daily (100-500 words)
-- Get feedback from team
 
 ---
 
 ## 📞 Getting Help
 
-### If Something Breaks
-1. Check `npm install` completed
-2. Verify Node.js version (should be 18+)
-3. Look at error messages carefully
-4. Try single source: `npm run scan -- --sources hackernews`
+### If Stuck on Tests
+```
+"Use tdd-coach to help me understand why this test is failing: [paste error]"
+```
 
-### If No Results
-1. Lower min-score: `--min-score 10`
-2. Expand time window: `--hours 48`
-3. Check source availability (Reddit/HN might be down)
+### If Type Errors
+```
+"Use type-enforcer to fix this TypeScript error: [paste error]"
+```
 
-### If Output is Ugly
-1. Make sure terminal supports colors
-2. Try Windows Terminal (better than CMD)
-3. Use VSCode integrated terminal
-
----
-
-## 🎉 Celebration Milestones
-
-- ✅ **First successful scan** - You're operational!
-- ⏳ **First anomaly detected** - System is smart!
-- ⏳ **First newsletter published** - You're creating!
-- ⏳ **First team member using it** - You're impacting!
-- ⏳ **First predicted story went viral** - You're prescient!
+### If Overwhelmed
+```
+"Use task-breakdown to simplify [current task] into smaller steps"
+```
 
 ---
 
-**Remember**: The goal is to become your own news source. Start small, iterate fast, and improve daily. You've got this! 🚀
+## 🎉 Milestones
+
+- [x] **v0.1.0** - CLI + AI Generation
+- [x] **v0.2.0** - Database + Publishing
+- [x] **v0.3.0** - Full Web Dashboard
+- [ ] **v0.4.0** - Testing + Quality (← YOU ARE HERE)
+- [ ] **v0.5.0** - Real-time + Collaboration
+
+---
+
+**Remember:** Test first, type strictly, document after. The subagents are here to help enforce this workflow. 🚀

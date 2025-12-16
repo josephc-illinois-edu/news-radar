@@ -73,7 +73,7 @@ export interface BulkAction {
 
 export interface SuggestedReply {
   content: string;
-  tone: 'professional' | 'friendly' | 'formal';
+  tone: 'professional' | 'friendly' | 'formal' | 'casual' | 'engaged' | 'brief';
   confidence: number;
 }
 

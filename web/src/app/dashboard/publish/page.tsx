@@ -69,7 +69,7 @@ export default function PublishPage() {
 
   const loadArticles = async () => {
     try {
-      const response = await fetch('/api/articles?status=draft,review');
+      const response = await fetch('/api/articles?status=draft,published');
       const data = await response.json();
       setArticles(data.data || []);
     } catch (err) {
@@ -244,6 +244,8 @@ export default function PublishPage() {
               {Object.entries(PLATFORM_INFO).map(([platform, info]) => {
                 const connection = connections.find(c => c.platform === platform);
                 const isConnected = connection?.connected;
+                // Allow selection in demo mode for testing the workflow
+                const canSelect = isConnected || isDemoMode;
 
                 return (
                   <div
@@ -255,24 +257,24 @@ export default function PublishPage() {
                         id={platform}
                         checked={selectedPlatforms.includes(platform as PublishPlatform)}
                         onCheckedChange={() => handlePlatformToggle(platform as PublishPlatform)}
-                        disabled={!isConnected}
+                        disabled={!canSelect}
                       />
                       <label
                         htmlFor={platform}
-                        className={`text-sm font-medium ${!isConnected ? 'text-muted-foreground' : ''}`}
+                        className={`text-sm font-medium ${!canSelect ? 'text-muted-foreground' : ''}`}
                       >
                         {info.name}
                       </label>
                     </div>
-                    <Badge variant={isConnected ? 'default' : 'outline'}>
-                      {isConnected ? 'Connected' : 'Not Connected'}
+                    <Badge variant={isConnected ? 'default' : isDemoMode ? 'secondary' : 'outline'}>
+                      {isConnected ? 'Connected' : isDemoMode ? 'Demo' : 'Not Connected'}
                     </Badge>
                   </div>
                 );
               })}
               {isDemoMode && (
                 <p className="text-xs text-muted-foreground mt-2">
-                  Connect platforms in Settings to enable publishing.
+                  Demo mode: Publishing will simulate the workflow. Configure environment variables for real publishing.
                 </p>
               )}
             </CardContent>

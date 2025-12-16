@@ -432,7 +432,7 @@ function parseTopicAnalysisResponse(
   }
 
   // Return fallback if parsing fails
-  return generateMockTopicIntelligence(topic, stories, {});
+  return generateMockTopicIntelligence(topic, stories, undefined);
 }
 
 function buildTimeline(

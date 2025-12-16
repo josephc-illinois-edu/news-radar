@@ -2,7 +2,8 @@
  * Publishing types
  */
 
-export type PublishPlatform = 'substack';
+// Currently only substack is implemented, but types support future platforms
+export type PublishPlatform = 'substack' | 'linkedin' | 'twitter' | 'facebook' | 'medium';
 export type PublishStatus = 'draft' | 'scheduled' | 'published' | 'failed';
 
 export interface PlatformConnection {
@@ -68,5 +69,36 @@ export const PLATFORM_INFO: Record<PublishPlatform, {
     supportsImages: true,
     supportsScheduling: true,
     authType: 'api_key', // Uses browser automation with email/password credentials
+  },
+  linkedin: {
+    name: 'LinkedIn',
+    icon: 'linkedin',
+    maxLength: 3000,
+    supportsImages: true,
+    supportsScheduling: false,
+    authType: 'oauth',
+  },
+  twitter: {
+    name: 'Twitter/X',
+    icon: 'twitter',
+    maxLength: 280,
+    supportsImages: true,
+    supportsScheduling: true,
+    authType: 'oauth',
+  },
+  facebook: {
+    name: 'Facebook',
+    icon: 'facebook',
+    maxLength: 63206,
+    supportsImages: true,
+    supportsScheduling: true,
+    authType: 'oauth',
+  },
+  medium: {
+    name: 'Medium',
+    icon: 'book-open',
+    supportsImages: true,
+    supportsScheduling: false,
+    authType: 'api_key',
   },
 };

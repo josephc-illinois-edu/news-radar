@@ -16,6 +16,7 @@ import type {
 import {
   scanHackerNews,
   scanLobsters,
+  scanProductHunt,
   scanAPNews,
   scanReuters,
   scanBBC,
@@ -31,6 +32,7 @@ import { getEnabledSources, getSourceFeedUrls } from '@/lib/sources';
 const SCANNER_MAP: Record<string, (limit: number, hoursBack?: number, minScore?: number) => Promise<StoryResult[]>> = {
   hackernews: scanHackerNews,
   lobsters: scanLobsters,
+  producthunt: scanProductHunt,
   apnews: scanAPNews,
   reuters: scanReuters,
   bbc: scanBBC,

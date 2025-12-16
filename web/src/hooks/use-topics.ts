@@ -106,11 +106,11 @@ export function useTopicWorkspace() {
     if (stored) {
       setState(prev => ({
         ...prev,
-        topic: stored.topic,
-        stories: stored.stories,
-        intelligence: stored.intelligence,
-        selectedAngle: stored.selectedAngle,
-        notes: stored.notes,
+        topic: stored.topic ?? null,
+        stories: stored.stories ?? [],
+        intelligence: stored.intelligence ?? null,
+        selectedAngle: stored.selectedAngle ?? null,
+        notes: Array.isArray(stored.notes) ? stored.notes : [],
       }));
     }
   }, []);
