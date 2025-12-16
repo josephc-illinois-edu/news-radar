@@ -23,14 +23,15 @@ export class APNewsScraper {
   private parser: Parser<unknown, APNewsRSSItem>;
   private config: APNewsScraperConfig;
 
-  // AP News RSS feeds by category
+  // AP News direct RSS was unreliable (rsshub.app), use Google News as proxy
+  // Google News searches site:apnews.com and provides RSS feed of results
   private readonly feedUrls: Record<string, string> = {
-    topnews: 'https://rsshub.app/apnews/topics/apf-topnews',
-    politics: 'https://rsshub.app/apnews/topics/apf-politics',
-    usnews: 'https://rsshub.app/apnews/topics/apf-usnews',
-    world: 'https://rsshub.app/apnews/topics/apf-intlnews',
-    technology: 'https://rsshub.app/apnews/topics/apf-technology',
-    health: 'https://rsshub.app/apnews/topics/apf-health',
+    topnews: 'https://news.google.com/rss/search?q=site:apnews.com&hl=en-US&gl=US&ceid=US:en',
+    politics: 'https://news.google.com/rss/search?q=site:apnews.com+politics&hl=en-US&gl=US&ceid=US:en',
+    usnews: 'https://news.google.com/rss/search?q=site:apnews.com+us+news&hl=en-US&gl=US&ceid=US:en',
+    world: 'https://news.google.com/rss/search?q=site:apnews.com+world&hl=en-US&gl=US&ceid=US:en',
+    technology: 'https://news.google.com/rss/search?q=site:apnews.com+technology&hl=en-US&gl=US&ceid=US:en',
+    health: 'https://news.google.com/rss/search?q=site:apnews.com+health&hl=en-US&gl=US&ceid=US:en',
   };
 
   constructor(config: Partial<APNewsScraperConfig> = {}) {

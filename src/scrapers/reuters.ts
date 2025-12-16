@@ -23,19 +23,21 @@ export class ReutersScraper {
   private parser: Parser<unknown, ReutersRSSItem>;
   private config: ReutersScraperConfig;
 
-  // Reuters RSS feeds by category
+  // Reuters direct RSS feeds are deprecated, use Google News as proxy
+  // Google News searches site:reuters.com and provides RSS feed of results
   private readonly feedUrls: Record<string, string> = {
-    world: 'https://www.reutersagency.com/feed/?taxonomy=best-topics&post_type=best',
-    business: 'https://www.reutersagency.com/feed/?best-topics=business-finance&post_type=best',
-    technology: 'https://www.reutersagency.com/feed/?best-topics=tech&post_type=best',
-    politics: 'https://www.reutersagency.com/feed/?best-topics=political-general&post_type=best',
+    world: 'https://news.google.com/rss/search?q=site:reuters.com+world&hl=en-US&gl=US&ceid=US:en',
+    business: 'https://news.google.com/rss/search?q=site:reuters.com+business&hl=en-US&gl=US&ceid=US:en',
+    technology: 'https://news.google.com/rss/search?q=site:reuters.com+technology&hl=en-US&gl=US&ceid=US:en',
+    politics: 'https://news.google.com/rss/search?q=site:reuters.com+politics&hl=en-US&gl=US&ceid=US:en',
+    general: 'https://news.google.com/rss/search?q=site:reuters.com&hl=en-US&gl=US&ceid=US:en',
   };
 
   constructor(config: Partial<ReutersScraperConfig> = {}) {
     this.parser = new Parser();
     this.config = {
-      categories: config.categories ?? ['world', 'politics'],
-      maxStoriesPerCategory: config.maxStoriesPerCategory ?? 15,
+      categories: config.categories ?? ['general'],
+      maxStoriesPerCategory: config.maxStoriesPerCategory ?? 20,
     };
   }
 
